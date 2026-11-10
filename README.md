@@ -45,3 +45,4 @@ print(r.provider_used, r.seed, [w.message for w in r.warnings])
 ## CI
 `.github/workflows/ci.yml`: push·PR 마다 Python 3.11~3.14 에서 `pytest`(LLM 실제 호출 없음, `P2M_LIVE` 미설정), 비밀 문자열 스캔(`tools/scan_secrets.py`), 의존성 라이선스 기록 검사(`tools/check_licenses.py`: `pyproject.toml` 의 의존성이 `data/sources.csv` 에 모두 있어야 함)를 돌린다.
 비밀 스캔 오탐(시험용 가짜 키 등)은 해당 줄 끝에 `# pragma: allowlist secret` 주석을 달아 제외한다.
+- LLM 공급자(Anthropic·OpenAI)는 `docs/providers.md` 에 확인 기록이 있다. 키는 코드·설정 파일·환경변수에 두지 않고 앱의 관리자 패널로만 등록한다(`docs/api-and-admin.md`).

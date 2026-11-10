@@ -1,0 +1,11 @@
+id,mood,expected_bpm,expected_key,valid,provider,attempts,ms_median,ms_runs,tracemalloc_peak_kb,midi_bytes,duration_s,notes,tempo_in_midi,tempo_match,key_declared,key_match,melody_in_declared_scale,sha256_8
+1,calm,70,C major,True,rule,1,5.68,5,112,883,41.14,102,70.0,True,C major,True,1.0,5837a935
+2,sad,60,A minor,True,rule,1,4.93,5,91,735,48.0,78,60.0,True,A minor,True,1.0,a0f6731f
+3,happy,120,G major,True,rule,1,10.63,5,219,2373,24.0,266,120.0,True,G major,True,1.0,8533f3d8
+4,energetic,140,E minor,True,rule,1,10.57,5,209,2377,20.57,266,140.0,True,E minor,True,1.0,b2a77e3b
+5,dark,80,D minor,True,rule,1,6.13,5,110,1191,36.0,126,80.0,True,D minor,True,1.0,69624914
+6,relaxing,85,F major,True,rule,1,10.73,5,220,2267,33.88,271,85.0,True,F major,True,1.0,ec9893e7
+7,epic,100,D major,True,rule,1,10.4,5,210,2322,28.8,266,100.0,True,D major,True,1.0,bcc94b5c
+8,romantic,90,Bb major,True,rule,1,7.0,5,147,1297,24.0,152,90.0,True,Bb major,True,1.0,2eac67c0
+9,playful,132,C major,True,rule,1,9.76,5,193,2231,21.82,242,132.0,True,C major,True,1.0,3ed90aaa
+10,meditative,55,G minor,True,rule,1,4.38,5,85,628,52.36,66,55.0,True,G minor,True,1.0,c0bad042

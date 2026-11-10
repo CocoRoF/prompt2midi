@@ -1,0 +1,12 @@
+[
+ {"id":1,"mood":"calm","bpm":70,"key":"C major","text":"A calm and relaxing piano piece in C major with a 4/4 time signature, moving at a slow Adagio tempo of about 70 BPM. It evokes peace and serenity."},
+ {"id":2,"mood":"sad","bpm":60,"key":"A minor","text":"A sad and melancholic song for piano and strings in A minor, 4/4 time signature, at a slow tempo of about 60 BPM, with a deeply emotional feel."},
+ {"id":3,"mood":"happy","bpm":120,"key":"G major","text":"A cheerful and upbeat pop song with acoustic guitar, bass and drums in G major, 4/4 time signature, at a lively tempo of about 120 BPM, evoking happiness."},
+ {"id":4,"mood":"energetic","bpm":140,"key":"E minor","text":"An energetic rock track featuring electric guitar, electric bass and drums in E minor, 4/4 time signature, at a fast tempo of about 140 BPM, with a powerful and intense mood."},
+ {"id":5,"mood":"dark","bpm":80,"key":"D minor","text":"A dark and mysterious cinematic piece for string ensemble and low brass in D minor, 4/4 time signature, at a moderate tempo of about 80 BPM, creating tension."},
+ {"id":6,"mood":"relaxing","bpm":85,"key":"F major","text":"A relaxing lo-fi jazz piece with electric piano, soft bass and light drums in F major, 4/4 time signature, at a laid-back tempo of about 85 BPM."},
+ {"id":7,"mood":"epic","bpm":100,"key":"D major","text":"An epic and heroic orchestral piece with strings, brass and timpani in D major, 4/4 time signature, at a tempo of about 100 BPM, with a triumphant mood."},
+ {"id":8,"mood":"romantic","bpm":90,"key":"Bb major","text":"A romantic and tender ballad for piano and violin in B-flat major, 3/4 time signature, at a gentle tempo of about 90 BPM, full of warmth and love."},
+ {"id":9,"mood":"playful","bpm":132,"key":"C major","text":"A playful and bouncy electronic dance track with synth lead, synth bass and drums in C major, 4/4 time signature, at a fast tempo of about 132 BPM."},
+ {"id":10,"mood":"meditative","bpm":55,"key":"G minor","text":"A meditative ambient composition with soft pads, harp and flute in G minor, 4/4 time signature, at a very slow tempo of about 55 BPM, evoking relaxation and calm."}
+]

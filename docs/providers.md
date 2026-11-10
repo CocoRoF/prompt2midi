@@ -32,6 +32,16 @@
 
 구현: `OpenAISDKAdapter`, `schema_for_openai`(필수화 + nullable 유니온 + 튜플→고정 길이 배열 + `default` 제거), 응답은 `strip_nulls`로 null 키를 지운 뒤 우리 검증을 통과해야 한다.
 
+## 2.5 시험한 SDK 버전 범위와 상한 (2026-11-10)
+| SDK | 시험한 버전 | 최신(PyPI, 같은 날) | 설치 범위 |
+|---|---|---|---|
+| anthropic | **1.4.0**, **2.7.0** | 2.7.0 | `>=1.4,<3` |
+| openai | **3.8.0**, **3.49.0** | 3.49.0 | `>=3.8,<4` |
+- 같은 시험(`tests/`, 489개)을 Python 3.11·3.12·3.13·3.14 와 위 두 조합(anthropic 1.4.0+openai 3.8.0 / anthropic 2.7.0+openai 3.49.0)에서 모두 통과시켰다(`uv run --isolated --python 3.x --with-editable ".[dev]" --with anthropic==… --with openai==… python -m pytest -q`).
+- **관찰된 SDK 차이**: anthropic 2.x 는 API 키를 `x-api-key` 가 아니라 `authorization: Bearer …` 헤더로 보낸다(1.x 는 `x-api-key`). 그래서 시험은 "키가 인증 헤더 하나에만 있고 다른 헤더·본문에는 없다"를 두 형태 모두에서 단언한다(`tests/test_llm_providers.py::sent_key`). 어댑터가 쓰는 호출(`messages.create(model, max_tokens, system, messages, output_config, timeout)`, `responses.create(model, instructions, input, text, max_output_tokens, store, timeout)`, 클라이언트 생성자 `api_key/max_retries/http_client/base_url`, `anthropic.transform_schema`)은 시그니처 검사로 두 조합 모두에 있음을 확인했다.
+- **상한을 둔 이유**: 위에서 보듯 주(major) 버전이 바뀌면 동작이 달라진다(인증 헤더). 다음 주 버전(anthropic 3, openai 4)은 시험해 보지 않았고 CI 가 설치 시점마다 최신을 받으므로, 검증하지 않은 주 버전이 자동으로 들어와 배포가 깨지거나 키 처리 가정이 어긋나는 것을 막으려고 상한을 둔다. 하한은 시험한 가장 낮은 버전이다. 사이 버전(예: anthropic 1.5~1.x, 2.0~2.6)은 **개별로 시험하지 않았다**(같은 주 버전 안이면 호환이라는 가정). 새 주 버전이 나오면 이 절의 시험을 다시 돌리고 상한을 올린다.
+- 이 절의 확인은 모두 메모리 전송·시그니처 수준이며 실제 API 호출은 하지 않았다.
+
 ## 3. 공통 설계
 - **입력은 신뢰하지 않는다**: 시스템 프롬프트(`providers/prompts.py`)와 사용자 설명을 분리하고, 사용자 글은 `<user_prompt>…</user_prompt>` 안에 넣는다(안의 닫는 태그는 제거). 모델 출력은 항상 `validate_spec` → `compile_spec` → `check_midi` 를 통과해야 MIDI가 된다.
 - **재시도·피드백**: SDK 자체 재시도는 끈다(`max_retries=0`). 재시도는 파이프라인이 오류 목록을 `<errors>` JSON으로 되돌려 한다.

@@ -30,6 +30,22 @@ def no_network(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", boom)
 
 
+def sent_key(request) -> str:
+    """The API key as sent by the SDK: Anthropic SDK 1.x uses `x-api-key`, 2.x uses `authorization: Bearer ...`.
+    Exactly one authentication header may carry it, and no other header may contain it."""
+    h = request["headers"]
+    carriers = [n for n in ("x-api-key", "authorization") if n in h]
+    assert len(carriers) == 1, f"expected one auth header, got {carriers}"
+    value = h[carriers[0]]
+    key = value[len("Bearer "):] if carriers[0] == "authorization" else value
+    if carriers[0] == "authorization":
+        assert value.startswith("Bearer ")
+    for name, v in h.items():
+        if name != carriers[0]:
+            assert key not in v, f"key leaked into header {name}"
+    return key
+
+
 class Server:
     """Records requests and answers from a queue of httpx.Response / exceptions / callables."""
 
@@ -93,7 +109,7 @@ def test_anthropic_request_shape_and_result():
     out = anth(srv).generate_spec(PROMPT, json_schema(), feedback=None)
     assert out == VALID_SPEC
     req = srv.requests[0]
-    assert req["path"] == "/v1/messages" and req["headers"]["x-api-key"] == A_KEY
+    assert req["path"] == "/v1/messages" and sent_key(req) == A_KEY
     b = req["body"]
     assert b["model"] == MODEL and b["max_tokens"] == 4096 and "system" in b
     assert b["output_config"]["format"]["type"] == "json_schema"
@@ -142,7 +158,7 @@ def test_key_and_model_are_read_on_every_call():
     p.generate_spec(PROMPT, json_schema())
     p.cell["key"], p.cell["model"] = "sk-ant-api03-SECONDKEYSECONDKEY9999", "other-model"  # pragma: allowlist secret
     p.generate_spec(PROMPT, json_schema())
-    assert [r["headers"]["x-api-key"] for r in srv.requests] == [A_KEY, "sk-ant-api03-SECONDKEYSECONDKEY9999"]  # pragma: allowlist secret
+    assert [sent_key(r) for r in srv.requests] == [A_KEY, "sk-ant-api03-SECONDKEYSECONDKEY9999"]  # pragma: allowlist secret
     assert [r["body"]["model"] for r in srv.requests] == [MODEL, "other-model"]
 
 
@@ -213,7 +229,7 @@ def test_openai_request_shape_and_null_stripping():
     spec, report = validate_spec(out)
     assert spec is not None and report.ok
     req = srv.requests[0]
-    assert req["path"] == "/v1/responses" and req["headers"]["authorization"] == f"Bearer {O_KEY}"
+    assert req["path"] == "/v1/responses" and sent_key(req) == O_KEY
     b = req["body"]
     assert b["model"] == MODEL and b["store"] is False and b["max_output_tokens"] == 4096
     assert b["input"] == f"<user_prompt>\n{PROMPT}\n</user_prompt>" and "instructions" in b

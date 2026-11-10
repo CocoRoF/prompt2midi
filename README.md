@@ -31,3 +31,13 @@ pip install -e ".[dev]"
 pytest
 ```
 LLM 키는 환경변수(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`)로만 받는다. 코드·설정 파일·로그에 키를 두지 않는다.
+
+## 오프라인으로 써 보기 (키·네트워크 없이)
+```python
+from prompt2midi.pipeline import generate
+r = generate("A calm piano piece in C major, 70 BPM")   # RuleProvider(키워드 사전)가 사양을 만든다
+open("calm.mid", "wb").write(r.midi)
+print(r.provider_used, r.seed, [w.message for w in r.warnings])
+```
+- 공급자는 `FakeProvider`(시험용)와 `RuleProvider`(규칙)만 있다. LLM 공급자(Anthropic/OpenAI)는 대표님 확인 뒤 단계 4.
+- 평가: `python -m prompt2midi.evaluation data/eval_prompts_research1.json --out data/eval_rule_results.csv --md docs/rule-provider-eval.md`

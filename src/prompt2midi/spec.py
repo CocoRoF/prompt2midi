@@ -107,11 +107,16 @@ GM_PROGRAM: dict[str, int] = {
     "synth_pad": 88,
 }
 
-# playable MIDI range (inclusive) used by the theory validator
+# Playable MIDI range (inclusive) used by the theory validator.
+# Source check, 2026-11-10 (English Wikipedia, article text, https://en.wikipedia.org/wiki/<Instrument>):
+#   confirmed: piano 21..108 (A0-C8, "Piano"); violin low G3=55 and high E7=100 ("Violin");
+#              marimba 45..96 (most common 4.3-octave A2-C7, "Marimba").
+#   NOT confirmed (my rounded approximations, no source opened): every other entry. In particular the
+#   trumpet's article gives F#3-C6 without saying whether that is written or sounding pitch.
 INSTRUMENT_RANGE: dict[str, tuple[int, int]] = {
     "piano": (21, 108), "electric_piano": (28, 103), "organ": (36, 96), "nylon_guitar": (40, 88),
     "steel_guitar": (40, 88), "upright_bass": (28, 67), "electric_bass": (28, 67),
-    "synth_bass": (24, 72), "violin": (55, 103), "strings": (36, 96), "trumpet": (55, 82),
+    "synth_bass": (24, 72), "violin": (55, 100), "strings": (36, 96), "trumpet": (55, 82),
     "sax": (49, 81), "flute": (60, 96), "clarinet": (50, 94), "marimba": (45, 96),
     "synth_lead": (36, 96), "synth_pad": (36, 96),
 }

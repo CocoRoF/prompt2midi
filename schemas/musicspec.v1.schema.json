@@ -1,0 +1,359 @@
+{
+  "$defs": {
+    "DrumStyle": {
+      "enum": [
+        "rock_basic",
+        "four_on_floor",
+        "half_time",
+        "shuffle",
+        "bossa"
+      ],
+      "title": "DrumStyle",
+      "type": "string"
+    },
+    "Instrument": {
+      "description": "Instrument names -> General MIDI program numbers (0-based) in GM_PROGRAM.",
+      "enum": [
+        "piano",
+        "electric_piano",
+        "organ",
+        "nylon_guitar",
+        "steel_guitar",
+        "upright_bass",
+        "electric_bass",
+        "synth_bass",
+        "violin",
+        "strings",
+        "trumpet",
+        "sax",
+        "flute",
+        "clarinet",
+        "marimba",
+        "synth_lead",
+        "synth_pad"
+      ],
+      "title": "Instrument",
+      "type": "string"
+    },
+    "Key": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/Mode"
+        },
+        "tonic": {
+          "$ref": "#/$defs/Tonic"
+        }
+      },
+      "required": [
+        "tonic",
+        "mode"
+      ],
+      "title": "Key",
+      "type": "object"
+    },
+    "Mode": {
+      "enum": [
+        "major",
+        "minor",
+        "dorian",
+        "mixolydian",
+        "lydian",
+        "phrygian",
+        "harmonic_minor"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "Motif": {
+      "additionalProperties": false,
+      "description": "Scale degrees (1 = tonic, 8 = tonic an octave up, negatives go below) + rhythm symbols.",
+      "properties": {
+        "degrees": {
+          "items": {
+            "maximum": 14,
+            "minimum": -7,
+            "type": "integer"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Degrees",
+          "type": "array"
+        },
+        "rhythm": {
+          "items": {
+            "$ref": "#/$defs/RhythmSymbol"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Rhythm",
+          "type": "array"
+        }
+      },
+      "required": [
+        "degrees",
+        "rhythm"
+      ],
+      "title": "Motif",
+      "type": "object"
+    },
+    "RhythmSymbol": {
+      "description": "Note lengths: w=whole h=half q=quarter e=eighth s=sixteenth, '.'=dotted, r-prefix=rest.",
+      "enum": [
+        "w",
+        "h",
+        "q",
+        "e",
+        "s",
+        "h.",
+        "q.",
+        "e.",
+        "rw",
+        "rh",
+        "rq",
+        "re",
+        "rs"
+      ],
+      "title": "RhythmSymbol",
+      "type": "string"
+    },
+    "Role": {
+      "enum": [
+        "melody",
+        "bass",
+        "chords",
+        "pad",
+        "drums"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "bars": {
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Bars",
+          "type": "integer"
+        },
+        "chords": {
+          "items": {
+            "pattern": "^[A-G](#|b)?(m7b5|maj7|dim|aug|sus2|sus4|m7|m|7)?$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Chords",
+          "type": "array"
+        },
+        "chords_per_bar": {
+          "default": 1,
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Chords Per Bar",
+          "type": "integer"
+        },
+        "energy": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Energy",
+          "type": "number"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9_]{1,8}$",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "bars",
+        "chords"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "Tonic": {
+      "enum": [
+        "C",
+        "C#",
+        "Db",
+        "D",
+        "D#",
+        "Eb",
+        "E",
+        "F",
+        "F#",
+        "Gb",
+        "G",
+        "G#",
+        "Ab",
+        "A",
+        "A#",
+        "Bb",
+        "B"
+      ],
+      "title": "Tonic",
+      "type": "string"
+    },
+    "Track": {
+      "additionalProperties": false,
+      "properties": {
+        "instrument": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Instrument"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "motif": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Motif"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "register": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "maximum": 127,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "maximum": 127,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Register"
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DrumStyle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "Track",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "key": {
+      "$ref": "#/$defs/Key"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Sections",
+      "type": "array"
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seed"
+    },
+    "tempo_bpm": {
+      "maximum": 220,
+      "minimum": 40,
+      "title": "Tempo Bpm",
+      "type": "integer"
+    },
+    "time_signature": {
+      "default": [
+        4,
+        4
+      ],
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Time Signature",
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 60,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "tracks": {
+      "items": {
+        "$ref": "#/$defs/Track"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Tracks",
+      "type": "array"
+    },
+    "version": {
+      "const": "1",
+      "default": "1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "tempo_bpm",
+    "key",
+    "sections",
+    "tracks"
+  ],
+  "title": "MusicSpec",
+  "type": "object"
+}

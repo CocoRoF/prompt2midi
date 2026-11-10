@@ -50,8 +50,9 @@ print(r.provider_used, r.seed, [w.message for w in r.warnings])
 ### 로컬 (uvicorn)
 ```bash
 pip install -e ".[dev]"
-P2M_DATA_DIR=./instance uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000
+P2M_DATA_DIR=./instance uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000 --no-proxy-headers
 ```
+- **`--no-proxy-headers` 를 꼭 붙인다.** uvicorn 기본값은 127.0.0.1 에서 온 `X-Forwarded-For` 를 믿고 클라이언트 주소를 바꾸므로, 붙이지 않으면 헤더 하나로 관리자 로그인 실패 제한(IP 당 5회)을 우회할 수 있다(구본우 확인: 헤더를 바꿔 가며 7번 시도해도 모두 401). 프록시 뒤에서의 설정은 아래 '운영 권고'.
 - 키 없이도 `http://127.0.0.1:8000/` 에서 규칙 공급자로 "문장 → MIDI 다운로드"가 된다. 관리자 화면은 `/admin`.
 - 데이터 디렉터리 `P2M_DATA_DIR`(기본 `./instance`, git 에서 제외됨)에 `admin.json`·`settings.json`·`secrets.json`·`usage.json` 이 0600 으로 저장된다.
 - 화면 폴더는 `P2M_WEB_DIR` 이 없으면 저장소의 `web/`, 없으면 현재 디렉터리의 `web/` 를 찾는다.

@@ -63,7 +63,7 @@
 
 ## 9. 구현 메모 (PR B, 2026-11-10 — 계약에서 비어 있던 부분을 구현하며 정한 것)
 계약의 의미는 바꾸지 않았다. "구현 시 확정"으로 남겨 둔 항목과 계약에 없던 세부를 적는다.
-- **진입점**: `uvicorn prompt2midi.api.app:app`. `app` 은 처음 접근할 때 만들어진다(모듈을 import 만 해서는 디렉터리·토큰이 생기지 않음). 시험·임베드용 `create_app(settings, adapters=None)`.
+- **진입점**: `uvicorn prompt2midi.api.app:app --no-proxy-headers` (uvicorn 의 기본 `--proxy-headers` 는 127.0.0.1 에서 온 `X-Forwarded-For` 로 클라이언트 주소를 바꿔 앱의 IP 제한을 헤더로 우회하게 만든다 — 구본우가 실제로 확인. 앱 자체가 `P2M_TRUST_PROXY` 로 헤더를 처리하므로 uvicorn 쪽은 끈다). `app` 은 처음 접근할 때 만들어진다(모듈을 import 만 해서는 디렉터리·토큰이 생기지 않음). 시험·임베드용 `create_app(settings, adapters=None)`.
 - **환경변수**: `P2M_DATA_DIR`(기본 `./instance`), `P2M_SECRET_KEY`(있으면 `secrets.json` 암호화), `P2M_MIDI_TTL`(초, 기본 3600), `P2M_TRUST_PROXY=1`(클라이언트 IP 를 `X-Forwarded-For` 의 **마지막** 항목으로 — 프록시 뒤에서만 켤 것. 꺼 두면 헤더는 무시되어 속도 제한을 헤더로 우회할 수 없다), `P2M_WEB_DIR`(화면 폴더, 기본 저장소의 `web/`). 키 자체를 받는 환경변수는 없다.
 - **키 암호화**: `cryptography` 의 Fernet. 키는 `P2M_SECRET_KEY` 에서 scrypt(n=2^14, r=8, p=1, 무작위 솔트 16바이트)로 유도. 쓸 때마다 새 솔트. 평문 파일은 읽을 수 있고 다음 쓰기에서 암호화로 바뀐다. 암호화된 파일을 다른/없는 `P2M_SECRET_KEY` 로 열면 저장된 키가 "없는 것"으로 보이고(로그에 경고, 키 값은 로그에 없음) 관리자가 다시 입력하면 된다.
 - **파일**: `admin.json`(scrypt 해시 n=2^14,r=8,p=1 + 솔트), `settings.json`, `secrets.json`, `usage.json`(그날 LLM 호출 수 — 재시작해도 하루 상한이 초기화되지 않게 저장). 전부 0600, 디렉터리 0700, 임시 파일에 쓴 뒤 교체.

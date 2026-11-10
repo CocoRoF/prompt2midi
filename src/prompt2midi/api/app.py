@@ -23,7 +23,7 @@ from .store import Store
 
 log = logging.getLogger("prompt2midi.api")
 
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; "
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 STATIC_SUFFIXES = (".html", ".js", ".css")
 

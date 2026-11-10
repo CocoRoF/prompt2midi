@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>prompt2midi</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="site">
+  <h1>prompt2midi</h1>
+  <p>문장으로 설명하면 MIDI 파일을 만들어 드립니다.</p>
+</header>
+<main id="main">
+  <section class="card" aria-labelledby="form-h">
+    <h2 id="form-h">프롬프트</h2>
+    <form id="gen-form" novalidate>
+      <label for="prompt">만들고 싶은 음악을 설명해 주세요</label>
+      <textarea id="prompt" name="prompt" required aria-describedby="prompt-count"></textarea>
+      <p class="counter" id="prompt-count" aria-live="off">0자</p>
+
+      <div class="row">
+        <div>
+          <label for="provider">공급자</label>
+          <select id="provider" name="provider"></select>
+          <p class="hint" id="provider-hint"></p>
+        </div>
+        <div>
+          <label for="seed">시드 (선택)</label>
+          <input id="seed" name="seed" type="number" step="1" inputmode="numeric">
+        </div>
+      </div>
+      <label class="inline-label"><input id="fallback" type="checkbox" checked> 실패하면 다른 공급자로 다시 시도</label>
+
+      <div class="actions">
+        <button id="submit" type="submit">생성</button>
+      </div>
+    </form>
+    <p id="status" class="hint" role="status" aria-live="polite"></p>
+    <div id="error" class="error hidden" role="alert"></div>
+  </section>
+
+  <section id="result" class="card hidden" aria-labelledby="result-h" tabindex="-1">
+    <h2 id="result-h">결과</h2>
+    <p id="result-meta"></p>
+    <a id="download" class="dl" download>MIDI 내려받기</a>
+    <h3>경고</h3>
+    <div id="warnings"></div>
+    <h3>시도 이력</h3>
+    <div id="attempts"></div>
+    <details>
+      <summary>사양(JSON) 보기</summary>
+      <pre id="spec" tabindex="0"></pre>
+    </details>
+  </section>
+</main>
+<footer class="site"><a href="/admin">관리</a></footer>
+<script src="/common.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -19,13 +19,13 @@ prompt ─▶ LLM provider ─▶ MusicSpec(JSON) ─▶ validate ─▶ compile
 | `src/prompt2midi/providers/` | LLM 공급자 추상화 (Anthropic, OpenAI, 시험용 Fake, 규칙 폴백) |
 | `src/prompt2midi/validate/` | 사양 스키마 검증 + 음악 이론 검증 |
 | `src/prompt2midi/compiler/` | 사양 → MIDI (시드 고정, 같은 입력=같은 바이트) |
-| `src/prompt2midi/api/` | 웹 백엔드 (FastAPI 예정) |
+| `src/prompt2midi/api/` | 웹 백엔드 (FastAPI) |
 | `web/` | 웹 화면 (빌드 없는 정적 페이지 1개로 시작) |
 | `tests/` | 시험 |
 | `data/` | 자료 수집 목록·평가 프롬프트 (출처·라이선스·기준일) |
 | `docs/` | 설계 문서 |
 
-## 실행 (현재는 뼈대 시험만)
+## 시험
 ```bash
 pip install -e ".[dev]"
 pytest
@@ -47,13 +47,45 @@ print(r.provider_used, r.seed, [w.message for w in r.warnings])
 비밀 스캔 오탐(시험용 가짜 키 등)은 해당 줄 끝에 `# pragma: allowlist secret` 주석을 달아 제외한다.
 
 ## 서버 실행 (웹 API + 화면)
+### 로컬 (uvicorn)
 ```bash
 pip install -e ".[dev]"
-uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000     # 데이터는 ./instance (P2M_DATA_DIR 로 바꿀 수 있음)
+P2M_DATA_DIR=./instance uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000
 ```
 - 키 없이도 `http://127.0.0.1:8000/` 에서 규칙 공급자로 "문장 → MIDI 다운로드"가 된다. 관리자 화면은 `/admin`.
-- **관리자 최초 설정**: 관리자가 아직 없으면 서버가 시작할 때 1회용 **설정 토큰**을 콘솔(서버 로그)에 한 줄 출력한다. `/admin` 에서 토큰과 비밀번호(12자 이상)를 넣어 설정한다.
-- **LLM 키 등록**: `/admin` 로그인 → 공급자 카드에 API 키·모델 이름 입력 → "사용" 켜기 → "공개 설정"에서 `public_llm` 을 켜야 일반 사용자가 LLM 을 고를 수 있다(기본 꺼짐; 비용은 키 소유자가 낸다). 키는 코드·설정 파일·환경변수 어디에도 두지 않는다. `P2M_SECRET_KEY` 를 지정하면 저장된 키가 암호화된다(지정하지 않으면 0600 평문 파일이며 관리자 화면에 경고가 뜬다).
-- **관리자 비밀번호를 잊었다면**: 서버를 멈추고 데이터 디렉터리의 `admin.json` 을 지운 뒤 다시 시작하면 새 설정 토큰이 출력된다(공급자 설정과 키는 그대로 남는다).
-- 환경변수와 구현 세부: [`docs/api-and-admin.md`](docs/api-and-admin.md) 9절. 프록시 뒤에서 쓰면 `P2M_TRUST_PROXY=1`.
+- 데이터 디렉터리 `P2M_DATA_DIR`(기본 `./instance`, git 에서 제외됨)에 `admin.json`·`settings.json`·`secrets.json`·`usage.json` 이 0600 으로 저장된다.
+- 화면 폴더는 `P2M_WEB_DIR` 이 없으면 저장소의 `web/`, 없으면 현재 디렉터리의 `web/` 를 찾는다.
 - 손으로 확인: `python tools/live_smoke.py` (실제 uvicorn 을 띄워 키 없는 흐름을 HTTP 로 점검).
+
+### Docker
+```bash
+docker build -t prompt2midi .
+docker run -d --name prompt2midi -p 8000:8000 -v p2m-data:/data prompt2midi
+docker logs prompt2midi        # 최초 설정 토큰 확인
+```
+- 컨테이너는 비루트 사용자(uid 10001)로 돌고, 데이터 디렉터리는 `/data`(`P2M_DATA_DIR=/data`)다. **`/data` 를 볼륨으로 마운트해야** 재시작·재생성 뒤에도 관리자 설정과 키가 남는다. 호스트 디렉터리를 마운트하면 uid 10001 이 쓸 수 있어야 한다.
+- 이미지에는 키를 넣지 않는다. 화면은 `/app/web`(`P2M_WEB_DIR`)에서 서빙한다.
+- `-e P2M_SECRET_KEY=<직접 만든 긴 무작위 문자열>` 을 주면 저장된 키가 암호화된다(지정하지 않으면 0600 평문 파일이며 관리자 화면에 경고가 뜬다). 이 값을 잃으면 저장된 키는 못 읽으므로 관리자가 다시 입력해야 한다.
+
+### 관리자 최초 설정
+1. 관리자가 아직 없으면 서버가 시작할 때 1회용 **설정 토큰**을 서버 로그(콘솔)에 한 줄 출력한다(재시작해도 관리자가 이미 있으면 출력되지 않는다).
+   ```
+   [prompt2midi] 관리자 최초 설정 토큰(1회용, 이 줄은 한 번만 출력됩니다): <토큰>
+   ```
+   Docker 는 `docker logs prompt2midi` 로 찾는다.
+2. `/admin` 에서 토큰과 비밀번호(12자 이상)를 넣어 설정한다. 이미 설정되었으면 409 `already_configured`.
+3. 이후 `/admin` 에서 비밀번호로 로그인한다(세션 12시간, 실패는 IP 당 10분에 5회까지).
+
+### LLM 키 등록
+`/admin` 로그인 → 공급자(Anthropic·OpenAI) 카드에 API 키·모델 이름 입력 → "사용" 켜기. 저장한 키는 다시 보이지 않고 끝 4자(`…abcd`)만 표시된다. 모델 이름이 비어 있으면 그 공급자는 쓸 수 없다. "연결 테스트"는 누를 때만 최소 호출 1회를 하며 **비용이 발생한다**. 일반 사용자가 LLM 을 고르게 하려면 "공개 설정"에서 `public_llm` 을 켠다(기본 꺼짐; 비용은 키 소유자가 낸다). 키는 코드·설정 파일·환경변수 어디에도 두지 않는다.
+
+### 관리자 비밀번호를 잊었다면
+재설정 링크는 없다. 서버를 멈추고 데이터 디렉터리의 **`admin.json` 만** 지운 뒤 다시 시작하면 새 설정 토큰이 로그에 출력된다. 공급자 설정(`settings.json`)과 키(`secrets.json`)는 그대로 남는다.
+Docker: `docker stop prompt2midi && docker run --rm -v p2m-data:/data busybox rm /data/admin.json && docker start prompt2midi && docker logs prompt2midi`
+
+### 운영 권고
+- **HTTPS 뒤에서 운영한다.** 관리자 비밀번호와 API 키가 평문 HTTP 로 오가면 안 된다. nginx·Caddy 같은 리버스 프록시나 로드밸런서에서 TLS 를 종단하고 컨테이너 포트(8000)는 외부에 직접 열지 않는다. 세션 쿠키의 `Secure` 는 HTTPS 일 때만 붙는다(프록시 뒤라면 `P2M_TRUST_PROXY=1` 이어야 `X-Forwarded-Proto` 를 본다).
+- **프록시 뒤에서는 `P2M_TRUST_PROXY=1`**: 속도 제한·로그인 실패 제한이 클라이언트 IP 를 `X-Forwarded-For` 의 **마지막** 항목으로 센다. 프록시 뒤에서만 켠다 — 꺼 두면 헤더는 무시되어 헤더로 제한을 우회할 수 없다(계약 `docs/api-and-admin.md` 9절).
+- **uvicorn 의 `--no-proxy-headers` 를 함께 쓴다.** uvicorn 은 기본으로 127.0.0.1 에서 온 `X-Forwarded-*` 를 믿고 클라이언트 주소를 바꾼다. 그러면 `P2M_TRUST_PROXY` 를 켜지 않았어도 같은 호스트의 프록시가 전달한 헤더로 IP 가 바뀌어, 앱이 헤더 처리를 직접 하는 위 규칙과 어긋난다. Docker 이미지는 이 옵션을 이미 준다. 직접 실행할 때는 `uvicorn … --no-proxy-headers` 로 한다.
+- `/data` 를 백업하고 접근 권한을 제한한다(키가 들어 있다).
+- 환경변수와 구현 세부: [`docs/api-and-admin.md`](docs/api-and-admin.md) 9절.

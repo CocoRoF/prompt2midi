@@ -74,7 +74,7 @@
 - **입력 범위**: 프롬프트 1..`max_prompt_chars`(관리자 설정, 1..2000, 기본 1000). 제한값 범위: `requests_per_minute` 1..600, `daily_llm_cap` 0..100000, `max_prompt_chars` 1..2000, `max_retries` 0..5. API 키 16..512자의 공백 없는 인쇄 가능 ASCII. 모델 이름 `[A-Za-z0-9._:/@+-]` 120자 이내. 숫자·불리언은 엄격 검사(`"5"`, `"yes"` 거부).
 - **`default_provider`**: `public_llm=false` 인데 기본이 LLM 이면 조용히 규칙 공급자로 처리한다(명시적으로 LLM 을 요청하면 403 `llm_disabled`).
 - **연결 테스트 응답**: `{"ok": bool, "latency_ms": int, "message": str}`(HTTP 200; 실패해도 200 이고 `ok:false`, 메시지는 키 제거됨). 요청은 `max_tokens` 64 의 최소 구조화 출력 1회.
-- **보안 헤더**: CSP(`default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; …`), `nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `/api/admin/*` 는 `Cache-Control: no-store`. `style-src-attr 'unsafe-inline'` 은 `web/admin.html` 의 인라인 `style` 속성 하나(로그아웃 줄) 때문이며, 그것을 CSS 클래스로 옮기면 지울 수 있다.
+- **보안 헤더**: CSP(`default-src 'none'; script-src 'self'; style-src 'self'; …`, 인라인 스타일·스크립트 없음), `nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `/api/admin/*` 는 `Cache-Control: no-store`. (이전에 있던 `style-src-attr 'unsafe-inline'` 은 `web/admin.html` 의 인라인 style 속성을 CSS 클래스로 옮긴 PR #12 뒤에 제거했다.)
 - **정적 파일**: `web/` 의 `*.html *.js *.css` 만 `/이름` 으로, `/` 는 `index.html`, `/admin` 은 `admin.html`. 그 밖의 파일(README 등)과 상위 경로는 404.
 - **SDK 로거**: `anthropic`·`openai`·`httpx`·`httpx2`·`httpcore` 를 WARNING 으로 고정.
 

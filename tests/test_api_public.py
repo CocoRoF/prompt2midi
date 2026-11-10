@@ -300,7 +300,7 @@ def test_security_headers(env):
         assert h["x-content-type-options"] == "nosniff" and h["referrer-policy"] == "no-referrer" and h["x-frame-options"] == "DENY"
         csp = h["content-security-policy"]
         assert "default-src 'none'" in csp and "script-src 'self'" in csp and "frame-ancestors 'none'" in csp
-        assert "'unsafe-inline'" not in csp.replace("style-src-attr 'unsafe-inline'", "")
+        assert "'unsafe-inline'" not in csp
     assert env.client.get("/api/admin/status").headers["cache-control"] == "no-store"
 
 
@@ -324,3 +324,17 @@ def test_the_app_object_is_created_lazily(monkeypatch, tmp_path):
     app = mod.app
     assert app is mod.app and (tmp_path / "lazy").is_dir()
     mod._APP = None
+
+
+def test_web_pages_have_no_inline_style_or_script():
+    """The CSP forbids inline styles/scripts; a style= attribute or inline <script> in web/ would silently break the screens."""
+    import re
+    from pathlib import Path
+
+    web = Path(__file__).resolve().parent.parent / "web"
+    for page in web.glob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        assert not re.search(r"\sstyle\s*=", text, re.I), f"{page.name}: inline style attribute"
+        assert not re.search(r"<style[\s>]", text, re.I), f"{page.name}: <style> element"
+        assert not re.search(r"<script(?![^>]*\ssrc=)[^>]*>", text, re.I), f"{page.name}: inline <script>"
+        assert not re.search(r"\son[a-z]+\s*=", text, re.I), f"{page.name}: inline event handler"

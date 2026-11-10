@@ -9,7 +9,8 @@ description = "Natural language to MIDI via LLM-generated, validated music specs
 requires-python = ">=3.11"
 # 이번 단계(1~3)에 필요한 것만. fastapi/uvicorn/anthropic/openai 는 해당 단계에서 추가 (설계안 8절)
 dependencies = ["pydantic>=2.5", "mido>=1.3"]
-# license: 미정 (LICENSE.PLACEHOLDER)
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

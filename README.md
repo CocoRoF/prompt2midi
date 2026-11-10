@@ -3,8 +3,8 @@
 자연어 설명을 LLM(Anthropic · OpenAI 교체 가능)이 **검증 가능한 음악 사양(JSON)** 으로 해석하고,
 결정적(deterministic) 컴파일러가 그 사양을 **MIDI 파일**로 만드는 오픈소스 프로젝트. 웹 서비스로 확장할 수 있는 구조.
 
-> 상태: **설계 단계**. 구현은 설계안(`docs/design.md`)을 대표님이 확인한 뒤 시작한다. 지금은 레포 뼈대만 있다.
-> 라이선스: **미정** (비상업 조건 예정). `LICENSE.PLACEHOLDER` 참고. 본문이 들어가기 전까지는 사용 허가가 없다.
+> 상태: 개발 중. 키 없이 도는 코어(사양·검증·컴파일러·규칙 공급자·파이프라인)가 있고, 웹 API·화면·LLM 공급자(Anthropic/OpenAI)·관리자 패널을 만드는 중이다. 계약: [`docs/api-and-admin.md`](docs/api-and-admin.md)
+> 라이선스: **PolyForm Noncommercial 1.0.0** ([`LICENSE`](LICENSE)). 비상업 목적에 한해 사용·수정·배포할 수 있다. OSI 정의의 오픈소스가 아니라 소스 공개(source-available) 라이선스이며, 법무 확인은 별도 과제다.
 
 ## 구조 한눈에
 ```
@@ -30,7 +30,7 @@ prompt ─▶ LLM provider ─▶ MusicSpec(JSON) ─▶ validate ─▶ compile
 pip install -e ".[dev]"
 pytest
 ```
-LLM 키는 환경변수(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`)로만 받는다. 코드·설정 파일·로그에 키를 두지 않는다.
+LLM 키는 **레포·환경변수에 넣지 않는다.** 앱의 관리자 패널(`/admin`)에서 관리자가 웹으로 입력해 등록한다(서버의 데이터 디렉터리에만 저장, 응답·로그에 노출하지 않음). 자세한 내용: `docs/api-and-admin.md`
 
 ## 오프라인으로 써 보기 (키·네트워크 없이)
 ```python

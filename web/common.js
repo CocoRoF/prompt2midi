@@ -58,6 +58,14 @@
     clear(box);
     box.classList.remove('hidden');
     box.appendChild(el('strong', { text: err.message }));
+    // 400 invalid_input 의 details 는 [{path,message}] 목록이다(예: prompt: String should have at most 2000 characters).
+    if (Array.isArray(err.details) && err.details.length && err.details.every(function (d) { return d && typeof d.message === 'string'; })) {
+      var ul = el('ul', { class: 'plain' });
+      err.details.forEach(function (d) {
+        ul.appendChild(el('li', {}, [d.path ? el('code', { text: String(d.path) }) : '', d.path ? ' ' : '', d.message]));
+      });
+      box.appendChild(ul);
+    }
     if (err.code) box.appendChild(el('div', { class: 'hint', text: '코드: ' + err.code }));
     return box;
   }

@@ -3,7 +3,7 @@
 자연어 설명을 LLM(Anthropic · OpenAI 교체 가능)이 **검증 가능한 음악 사양(JSON)** 으로 해석하고,
 결정적(deterministic) 컴파일러가 그 사양을 **MIDI 파일**로 만드는 오픈소스 프로젝트. 웹 서비스로 확장할 수 있는 구조.
 
-> 상태: 개발 중. 키 없이 도는 코어(사양·검증·컴파일러·규칙 공급자·파이프라인)가 있고, 웹 API·화면·LLM 공급자(Anthropic/OpenAI)·관리자 패널을 만드는 중이다. 계약: [`docs/api-and-admin.md`](docs/api-and-admin.md)
+> 상태: v0 — 키 없이도 규칙 공급자로 '자연어 → MIDI 다운로드'가 되는 웹 서버(FastAPI)와 화면(`/`, 관리자 `/admin`)이 동작한다. Anthropic·OpenAI 공급자는 구현·시험(가짜 전송)까지 되어 있고, **실제 API 호출은 관리자가 패널에 키를 등록한 뒤에야 검증할 수 있다(미검증)**. 실행 방법은 아래 '서버 실행', 계약은 [`docs/api-and-admin.md`](docs/api-and-admin.md).
 > 라이선스: **PolyForm Noncommercial 1.0.0** ([`LICENSE`](LICENSE)). 비상업 목적에 한해 사용·수정·배포할 수 있다. OSI 정의의 오픈소스가 아니라 소스 공개(source-available) 라이선스이며, 법무 확인은 별도 과제다.
 
 ## 구조 한눈에

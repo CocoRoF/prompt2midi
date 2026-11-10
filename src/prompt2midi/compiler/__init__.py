@@ -1,1 +1,4 @@
-"""compiler (뼈대: 구현은 설계안 확인 뒤)."""
+"""Compiler: MusicSpec + seed -> MIDI bytes (deterministic)."""
+from .render import PPQ, CompileError, compile_spec
+
+__all__ = ["PPQ", "CompileError", "compile_spec"]

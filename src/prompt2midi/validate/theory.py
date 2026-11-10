@@ -1,6 +1,7 @@
 """Step 2 of validation: musical and resource rules that the schema cannot express."""
 from __future__ import annotations
 
+from ..music import MIN_REGISTER_SPAN as _MIN_SPAN, effective_register, motif_pitches
 from ..spec import (
     CHORD_QUALITIES,
     INSTRUMENT_RANGE,
@@ -18,7 +19,6 @@ from .issues import Issue
 MAX_DURATION_SECONDS = 300.0  # 5 minutes (design 4.2)
 MAX_TOTAL_BARS = 256
 MAX_ESTIMATED_NOTES = 20000
-MIN_MELODY_SPAN = 12  # semitones
 
 # chord quality -> intervals above the root
 CHORD_TONES: dict[str, tuple[int, ...]] = {
@@ -75,6 +75,10 @@ def check_theory(spec: MusicSpec, *, strict_diatonic: bool = False) -> list[Issu
             a, b = t.pitch_range
             if a < lo or b > hi:
                 issues.append(Issue(f"tracks[{i}].register", f"register {a}..{b} is outside the range of {t.instrument.value} ({lo}..{hi})", "register_out_of_range"))
-            if t.role is Role.melody and b - a < MIN_MELODY_SPAN:
-                issues.append(Issue(f"tracks[{i}].register", f"melody register must span at least {MIN_MELODY_SPAN} semitones", "register_too_narrow"))
+        ra, rb = effective_register(t)
+        if rb - ra < _MIN_SPAN:
+            where = "register" if t.pitch_range is not None else "instrument"
+            issues.append(Issue(f"tracks[{i}].{where}", f"{t.role.value} register {ra}..{rb} spans less than {_MIN_SPAN} semitones; set a wider 'register' that fits {t.instrument.value} ({lo}..{hi})", "register_too_narrow"))
+        elif t.role is Role.melody and motif_pitches(spec, t) is None:
+            issues.append(Issue(f"tracks[{i}].motif", f"the motif spans more than the register {ra}..{rb}; use fewer distant degrees or a wider register", "motif_out_of_register"))
     return issues

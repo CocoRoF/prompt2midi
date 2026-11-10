@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>prompt2midi 관리</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="site">
+  <h1>prompt2midi 관리</h1>
+  <p><a href="/">공개 화면으로</a></p>
+</header>
+<main id="main">
+  <div id="msg" role="status" aria-live="polite" class="hint"></div>
+  <div id="error" class="error hidden" role="alert"></div>
+
+  <section id="view-loading" class="card"><p>불러오는 중…</p></section>
+
+  <section id="view-setup" class="card hidden" aria-labelledby="setup-h">
+    <h2 id="setup-h">최초 설정</h2>
+    <p>서버를 처음 실행하면 콘솔(서버 로그)에 설정 토큰이 한 번 출력됩니다. 토큰과 새 비밀번호를 입력하세요. 토큰은 한 번만 쓸 수 있습니다.</p>
+    <form id="setup-form" novalidate>
+      <label for="setup-token">설정 토큰</label>
+      <input id="setup-token" type="password" autocomplete="off" required>
+      <label for="setup-pass">비밀번호 (12자 이상)</label>
+      <input id="setup-pass" type="password" autocomplete="new-password" minlength="12" required>
+      <label for="setup-pass2">비밀번호 확인</label>
+      <input id="setup-pass2" type="password" autocomplete="new-password" minlength="12" required>
+      <p class="hint">비밀번호를 잃어버리면 복구 링크가 없습니다. 서버의 <code>admin.json</code> 을 지우고 다시 설정해야 합니다.</p>
+      <div class="actions"><button type="submit">설정 완료</button></div>
+    </form>
+  </section>
+
+  <section id="view-login" class="card hidden" aria-labelledby="login-h">
+    <h2 id="login-h">로그인</h2>
+    <form id="login-form" novalidate>
+      <label for="login-pass">비밀번호</label>
+      <input id="login-pass" type="password" autocomplete="current-password" required>
+      <div class="actions"><button type="submit">로그인</button></div>
+    </form>
+  </section>
+
+  <div id="view-panel" class="hidden">
+    <div id="banner-plain" class="banner hidden" role="alert">
+      <strong>API 키가 암호화되지 않고 저장됩니다.</strong>
+      서버에 <code>P2M_SECRET_KEY</code> 환경변수가 없어 키가 평문 파일(<code>secrets.json</code>, 권한 0600)에 들어갑니다. 서버 디스크에 접근할 수 있는 사람은 키를 읽을 수 있습니다.
+    </div>
+    <div class="actions" style="margin:0 0 1rem"><button id="logout" class="secondary" type="button">로그아웃</button></div>
+
+    <h2>LLM 공급자</h2>
+    <div id="providers"></div>
+
+    <section class="card" aria-labelledby="pub-h">
+      <h2 id="pub-h">공개 설정</h2>
+      <form id="public-form">
+        <label class="inline-label"><input id="public-llm" type="checkbox"> 공개 사용자가 LLM 공급자를 쓰게 허용 (<code>public_llm</code>)</label>
+        <p class="hint">켜면 방문자의 생성 요청에도 등록된 키로 비용이 발생합니다. 꺼 두면 공개 화면에서는 Rule 공급자만 쓸 수 있습니다.</p>
+        <label for="default-provider">기본 공급자</label>
+        <select id="default-provider"></select>
+        <div class="actions"><button type="submit">저장</button></div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="lim-h">
+      <h2 id="lim-h">제한값</h2>
+      <form id="limits-form">
+        <div class="row">
+          <div><label for="lim-rpm">IP당 분당 요청 수</label><input id="lim-rpm" type="number" min="1" step="1"></div>
+          <div><label for="lim-daily">하루 LLM 호출 상한</label><input id="lim-daily" type="number" min="0" step="1"></div>
+        </div>
+        <div class="row">
+          <div><label for="lim-chars">프롬프트 최대 글자 수</label><input id="lim-chars" type="number" min="1" step="1"></div>
+          <div><label for="lim-retries">최대 재시도 횟수</label><input id="lim-retries" type="number" min="0" step="1"></div>
+        </div>
+        <p class="hint">허용 범위는 서버가 검증하며, 거절되면 서버 메시지를 그대로 보여 드립니다.</p>
+        <div class="actions"><button type="submit">저장</button></div>
+      </form>
+    </section>
+  </div>
+</main>
+<footer class="site">prompt2midi 관리자 패널</footer>
+<script src="/common.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>

@@ -45,3 +45,15 @@ print(r.provider_used, r.seed, [w.message for w in r.warnings])
 ## CI
 `.github/workflows/ci.yml`: push·PR 마다 Python 3.11~3.14 에서 `pytest`(LLM 실제 호출 없음, `P2M_LIVE` 미설정), 비밀 문자열 스캔(`tools/scan_secrets.py`), 의존성 라이선스 기록 검사(`tools/check_licenses.py`: `pyproject.toml` 의 의존성이 `data/sources.csv` 에 모두 있어야 함)를 돌린다.
 비밀 스캔 오탐(시험용 가짜 키 등)은 해당 줄 끝에 `# pragma: allowlist secret` 주석을 달아 제외한다.
+
+## 서버 실행 (웹 API + 화면)
+```bash
+pip install -e ".[dev]"
+uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000     # 데이터는 ./instance (P2M_DATA_DIR 로 바꿀 수 있음)
+```
+- 키 없이도 `http://127.0.0.1:8000/` 에서 규칙 공급자로 "문장 → MIDI 다운로드"가 된다. 관리자 화면은 `/admin`.
+- **관리자 최초 설정**: 관리자가 아직 없으면 서버가 시작할 때 1회용 **설정 토큰**을 콘솔(서버 로그)에 한 줄 출력한다. `/admin` 에서 토큰과 비밀번호(12자 이상)를 넣어 설정한다.
+- **LLM 키 등록**: `/admin` 로그인 → 공급자 카드에 API 키·모델 이름 입력 → "사용" 켜기 → "공개 설정"에서 `public_llm` 을 켜야 일반 사용자가 LLM 을 고를 수 있다(기본 꺼짐; 비용은 키 소유자가 낸다). 키는 코드·설정 파일·환경변수 어디에도 두지 않는다. `P2M_SECRET_KEY` 를 지정하면 저장된 키가 암호화된다(지정하지 않으면 0600 평문 파일이며 관리자 화면에 경고가 뜬다).
+- **관리자 비밀번호를 잊었다면**: 서버를 멈추고 데이터 디렉터리의 `admin.json` 을 지운 뒤 다시 시작하면 새 설정 토큰이 출력된다(공급자 설정과 키는 그대로 남는다).
+- 환경변수와 구현 세부: [`docs/api-and-admin.md`](docs/api-and-admin.md) 9절. 프록시 뒤에서 쓰면 `P2M_TRUST_PROXY=1`.
+- 손으로 확인: `python tools/live_smoke.py` (실제 uvicorn 을 띄워 키 없는 흐름을 HTTP 로 점검).

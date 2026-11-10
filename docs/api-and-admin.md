@@ -60,3 +60,20 @@
 ## 8. 라이선스
 - 프로젝트 라이선스는 **PolyForm Noncommercial 1.0.0**(`LICENSE`, 원문은 polyformproject.org 에서 가져옴). 일반적인 OSI 오픈소스가 아니라 소스 공개(source-available)이며 법무 확인은 별도 과제다.
 - 의존성은 `data/sources.csv`에 라이선스를 기록한다. 비상업 조건과 충돌할 수 있는 의존성(예: 상업 이용을 막는 모델 가중치)은 번들하지 않는다.
+
+## 9. 구현 메모 (PR B, 2026-11-10 — 계약에서 비어 있던 부분을 구현하며 정한 것)
+계약의 의미는 바꾸지 않았다. "구현 시 확정"으로 남겨 둔 항목과 계약에 없던 세부를 적는다.
+- **진입점**: `uvicorn prompt2midi.api.app:app`. `app` 은 처음 접근할 때 만들어진다(모듈을 import 만 해서는 디렉터리·토큰이 생기지 않음). 시험·임베드용 `create_app(settings, adapters=None)`.
+- **환경변수**: `P2M_DATA_DIR`(기본 `./instance`), `P2M_SECRET_KEY`(있으면 `secrets.json` 암호화), `P2M_MIDI_TTL`(초, 기본 3600), `P2M_TRUST_PROXY=1`(클라이언트 IP 를 `X-Forwarded-For` 의 **마지막** 항목으로 — 프록시 뒤에서만 켤 것. 꺼 두면 헤더는 무시되어 속도 제한을 헤더로 우회할 수 없다), `P2M_WEB_DIR`(화면 폴더, 기본 저장소의 `web/`). 키 자체를 받는 환경변수는 없다.
+- **키 암호화**: `cryptography` 의 Fernet. 키는 `P2M_SECRET_KEY` 에서 scrypt(n=2^14, r=8, p=1, 무작위 솔트 16바이트)로 유도. 쓸 때마다 새 솔트. 평문 파일은 읽을 수 있고 다음 쓰기에서 암호화로 바뀐다. 암호화된 파일을 다른/없는 `P2M_SECRET_KEY` 로 열면 저장된 키가 "없는 것"으로 보이고(로그에 경고, 키 값은 로그에 없음) 관리자가 다시 입력하면 된다.
+- **파일**: `admin.json`(scrypt 해시 n=2^14,r=8,p=1 + 솔트), `settings.json`, `secrets.json`, `usage.json`(그날 LLM 호출 수 — 재시작해도 하루 상한이 초기화되지 않게 저장). 전부 0600, 디렉터리 0700, 임시 파일에 쓴 뒤 교체.
+- **세션**: 서버 메모리(재시작하면 모두 로그아웃). 쿠키 `p2m_session`, 12시간. 로그아웃은 CSRF 필요. 한 사람이 여러 세션을 가질 수 있고 각 세션의 CSRF 토큰은 서로 다르다.
+- **오류 코드(관리자·공통, 계약 2절 코드에 추가)**: 400 `invalid_input`(검증 실패, `details:[{path,message}]`; 제출한 값은 되풀이하지 않음), 401 `unauthorized`(세션 없음/만료)·`invalid_credentials`, 403 `csrf_failed`·`invalid_setup_token`·`llm_disabled`, 404 `not_found`, 405 `method_not_allowed`, 409 `already_configured`·`not_configured`, 429 `rate_limited`(로그인/설정 실패 제한 포함)·`daily_cap_reached`, 500 `internal_error`(내용 없음).
+- **로그인/설정 실패 제한**: IP 당 10분에 5회(설정 토큰 오입력도 같은 카운터). 실패마다 0.5초 지연. 성공하면 카운터 초기화.
+- **속도 제한**: `/api/generate` 요청(검증 실패 포함)을 IP 당 분당 N회(기본 10)로 센다. 하루 LLM 상한은 **실제 LLM 호출(시도) 수**로 세며 UTC 날짜 기준, 실패한 시도도 센다. 상한 확인은 요청 시작 시 한 번이라 마지막 요청이 `max_retries` 만큼 넘길 수 있다. 규칙 공급자는 상한과 무관.
+- **입력 범위**: 프롬프트 1..`max_prompt_chars`(관리자 설정, 1..2000, 기본 1000). 제한값 범위: `requests_per_minute` 1..600, `daily_llm_cap` 0..100000, `max_prompt_chars` 1..2000, `max_retries` 0..5. API 키 16..512자의 공백 없는 인쇄 가능 ASCII. 모델 이름 `[A-Za-z0-9._:/@+-]` 120자 이내. 숫자·불리언은 엄격 검사(`"5"`, `"yes"` 거부).
+- **`default_provider`**: `public_llm=false` 인데 기본이 LLM 이면 조용히 규칙 공급자로 처리한다(명시적으로 LLM 을 요청하면 403 `llm_disabled`).
+- **연결 테스트 응답**: `{"ok": bool, "latency_ms": int, "message": str}`(HTTP 200; 실패해도 200 이고 `ok:false`, 메시지는 키 제거됨). 요청은 `max_tokens` 64 의 최소 구조화 출력 1회.
+- **보안 헤더**: CSP(`default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; …`), `nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `/api/admin/*` 는 `Cache-Control: no-store`. `style-src-attr 'unsafe-inline'` 은 `web/admin.html` 의 인라인 `style` 속성 하나(로그아웃 줄) 때문이며, 그것을 CSS 클래스로 옮기면 지울 수 있다.
+- **정적 파일**: `web/` 의 `*.html *.js *.css` 만 `/이름` 으로, `/` 는 `index.html`, `/admin` 은 `admin.html`. 그 밖의 파일(README 등)과 상위 경로는 404.
+- **SDK 로거**: `anthropic`·`openai`·`httpx`·`httpx2`·`httpcore` 를 WARNING 으로 고정.

@@ -1,6 +1,7 @@
 """FastAPI application (entry point: prompt2midi.api.app:app). Contract: docs/api-and-admin.md."""
 from __future__ import annotations
 
+import contextlib
 import logging
 import secrets
 import time
@@ -59,6 +60,7 @@ def create_app(cfg: AppSettings | None = None, adapters: dict | None = None) -> 
         setup_token=None if store.admin_record() else secrets.token_urlsafe(24), adapters=adapters,
     )
 
+    @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
         if state.setup_token and not state.setup_announced:
             state.setup_announced = True

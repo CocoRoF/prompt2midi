@@ -77,3 +77,22 @@
 - **보안 헤더**: CSP(`default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; …`), `nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `/api/admin/*` 는 `Cache-Control: no-store`. `style-src-attr 'unsafe-inline'` 은 `web/admin.html` 의 인라인 `style` 속성 하나(로그아웃 줄) 때문이며, 그것을 CSS 클래스로 옮기면 지울 수 있다.
 - **정적 파일**: `web/` 의 `*.html *.js *.css` 만 `/이름` 으로, `/` 는 `index.html`, `/admin` 은 `admin.html`. 그 밖의 파일(README 등)과 상위 경로는 404.
 - **SDK 로거**: `anthropic`·`openai`·`httpx`·`httpx2`·`httpcore` 를 WARNING 으로 고정.
+
+### 9.1 서버 의존성의 시험한 버전 범위와 상한 (2026-11-10)
+PR #10 의 SDK(anthropic·openai, `docs/providers.md` 2.5절)와 같은 기준이다: **시험한 가장 낮은 버전을 하한, 시험하지 않은 다음 주 버전부터를 상한**으로 둔다.
+| 라이브러리 | 설치 범위 | 시험한 하한 | 시험한 최신(같은 날 PyPI 최신) | 상한 근거 |
+|---|---|---|---|---|
+| fastapi | `>=0.115,<1` | 0.115.0 (starlette 0.38.6 와 함께) | 0.162.2 (starlette 1.10.0 와 함께) | 0.x 이므로 이론상 minor 마다 깨질 수 있으나 우리가 쓰는 부분(라우터·의존성·검증 오류 핸들러·lifespan)은 0.115~0.162 전 구간에서 통과. 1.0 은 시험 전이라 막는다 |
+| uvicorn | `>=0.30,<1` | 0.30.0 | 0.54.0 | 서버 실행에만 쓰며 `tools/live_smoke.py` 로 실제 기동을 확인. 1.0 미시험 |
+| cryptography | `>=42,<51` | 42.0.0 | 50.0.2 | 우리는 Fernet 과 scrypt 호출만 쓴다(오래 안정된 API). 이 라이브러리는 주 버전을 자주 올리므로(42→50 이 짧은 기간) 51 부터는 시험 뒤에 올린다 |
+| starlette | (직접 의존 없음, fastapi 가 가져옴) | 0.38.6 | 1.10.0 | **주 버전이 0.x→1.x 로 바뀌는 구간이 이미 범위 안**에 있다(fastapi 0.115 는 `starlette<0.39`, 0.162 는 1.10). 두 끝과 중간(fastapi 0.141.1 + starlette 1.6.0)을 모두 시험했다. 상한은 fastapi 의 상한이 대신한다 |
+| httpx (개발 전용) | 제한 없음 | – | 0.28.1 | TestClient 용, 배포물에 포함되지 않음 |
+- 시험 방법(전부 590개 통과): `uv run --isolated --python 3.x --with-editable ".[dev]" [--with fastapi==… --with uvicorn==… --with cryptography==…] python -m pytest -q`.
+  | 환경 | 결과 |
+  |---|---|
+  | Python 3.11 / 3.12 / 3.13 / 3.14, 기본 해석(전부 최신) | 590 passed ×4 |
+  | Python 3.11, 3.12, 하한 조합(fastapi 0.115.0, uvicorn 0.30.0, cryptography 42.0.0) | 590 passed ×2 |
+  | Python 3.12, 중간 조합(fastapi 0.141.1, starlette 1.6.0, uvicorn 0.52.4, cryptography 50.0.1) | 590 passed |
+  하한 조합은 3.14 에서 시험하지 않았다(cryptography 42 의 3.14 휠이 없을 수 있어 3.12 이하에서만 확인; 미확인).
+- **정책 한 줄**: 0.x 라이브러리(fastapi, uvicorn, starlette)는 `<1` 로, 주 버전이 자주 오르는 cryptography 는 시험한 주 버전까지(`<51`)만 허용하고, 새 주 버전이 나오면 위 시험을 다시 돌린 뒤 상한을 올린다. `data/sources.csv` 의 해당 행에 같은 범위를 적었다.
+- 이 시험 중 하한 조합에서 starlette 가 "async generator lifespan 은 폐기 예정" 경고를 111번 냈다. `lifespan` 을 `contextlib.asynccontextmanager` 로 바꿔 경고를 없앴다(동작 변화 없음).

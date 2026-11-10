@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt2midi"
+version = "0.0.0"
+description = "Natural language to MIDI via LLM-generated, validated music specs"
+requires-python = ">=3.11"
+dependencies = []          # 구현 단계에서 확정: pydantic, mido, fastapi, uvicorn, anthropic, openai (설계안 8절)
+# license: 미정 (LICENSE.PLACEHOLDER)
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

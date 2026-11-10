@@ -1,6 +1,6 @@
 from prompt2midi.providers.secrets import REDACTED, mask_secrets
 
-KEY = "sk-ant-api03-ABCDEFGHIJKLMNOP1234567890xyz"
+KEY = "sk-ant-api03-ABCDEFGHIJKLMNOP1234567890xyz"  # pragma: allowlist secret
 
 
 def test_full_key_is_removed():

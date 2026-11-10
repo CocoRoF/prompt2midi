@@ -16,8 +16,8 @@ from prompt2midi.spec import json_schema
 from prompt2midi.validate import validate_spec
 from tests.conftest import VALID_SPEC
 
-A_KEY = "sk-ant-api03-ABCDEFGHIJKLMNOP1234567890xyz"
-O_KEY = "sk-proj-QRSTUVWXYZabcdef0987654321uvw"
+A_KEY = "sk-ant-api03-ABCDEFGHIJKLMNOP1234567890xyz"  # pragma: allowlist secret
+O_KEY = "sk-proj-QRSTUVWXYZabcdef0987654321uvw"  # pragma: allowlist secret
 MODEL = "test-model-name"  # tests never use a real model name
 PROMPT = "A calm piano piece in C major, 70 BPM"
 
@@ -140,9 +140,9 @@ def test_key_and_model_are_read_on_every_call():
     srv = Server(a_msg(SPEC_JSON))
     p = anth(srv)
     p.generate_spec(PROMPT, json_schema())
-    p.cell["key"], p.cell["model"] = "sk-ant-api03-SECONDKEYSECONDKEY9999", "other-model"
+    p.cell["key"], p.cell["model"] = "sk-ant-api03-SECONDKEYSECONDKEY9999", "other-model"  # pragma: allowlist secret
     p.generate_spec(PROMPT, json_schema())
-    assert [r["headers"]["x-api-key"] for r in srv.requests] == [A_KEY, "sk-ant-api03-SECONDKEYSECONDKEY9999"]
+    assert [r["headers"]["x-api-key"] for r in srv.requests] == [A_KEY, "sk-ant-api03-SECONDKEYSECONDKEY9999"]  # pragma: allowlist secret
     assert [r["body"]["model"] for r in srv.requests] == [MODEL, "other-model"]
 
 

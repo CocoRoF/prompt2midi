@@ -39,10 +39,9 @@ r = generate("A calm piano piece in C major, 70 BPM")   # RuleProvider(키워드
 open("calm.mid", "wb").write(r.midi)
 print(r.provider_used, r.seed, [w.message for w in r.warnings])
 ```
-- 공급자는 `FakeProvider`(시험용)와 `RuleProvider`(규칙)만 있다. LLM 공급자(Anthropic/OpenAI)는 대표님 확인 뒤 단계 4.
+- 공급자: `RuleProvider`(규칙, 키 불필요), `FakeProvider`(시험용), `AnthropicProvider`·`OpenAIProvider`(키·모델은 앱의 관리자 패널로 등록해 요청마다 읽음; 확인 기록은 `docs/providers.md`). 키는 코드·설정 파일·환경변수에 두지 않는다(`docs/api-and-admin.md`).
 - 평가: `python -m prompt2midi.evaluation data/eval_prompts_research1.json --out data/eval_rule_results.csv --md docs/rule-provider-eval.md`
 
 ## CI
 `.github/workflows/ci.yml`: push·PR 마다 Python 3.11~3.14 에서 `pytest`(LLM 실제 호출 없음, `P2M_LIVE` 미설정), 비밀 문자열 스캔(`tools/scan_secrets.py`), 의존성 라이선스 기록 검사(`tools/check_licenses.py`: `pyproject.toml` 의 의존성이 `data/sources.csv` 에 모두 있어야 함)를 돌린다.
 비밀 스캔 오탐(시험용 가짜 키 등)은 해당 줄 끝에 `# pragma: allowlist secret` 주석을 달아 제외한다.
-- LLM 공급자(Anthropic·OpenAI)는 `docs/providers.md` 에 확인 기록이 있다. 키는 코드·설정 파일·환경변수에 두지 않고 앱의 관리자 패널로만 등록한다(`docs/api-and-admin.md`).

@@ -39,7 +39,7 @@ r = generate("A calm piano piece in C major, 70 BPM")   # RuleProvider(키워드
 open("calm.mid", "wb").write(r.midi)
 print(r.provider_used, r.seed, [w.message for w in r.warnings])
 ```
-- 공급자는 `FakeProvider`(시험용)와 `RuleProvider`(규칙)만 있다. LLM 공급자(Anthropic/OpenAI)는 대표님 확인 뒤 단계 4.
+- 공급자: `RuleProvider`(규칙, 키 불필요), `FakeProvider`(시험용), `AnthropicProvider`·`OpenAIProvider`(키·모델은 앱의 관리자 패널로 등록해 요청마다 읽음; 확인 기록은 `docs/providers.md`). 키는 코드·설정 파일·환경변수에 두지 않는다(`docs/api-and-admin.md`).
 - 평가: `python -m prompt2midi.evaluation data/eval_prompts_research1.json --out data/eval_rule_results.csv --md docs/rule-provider-eval.md`
 
 ## CI

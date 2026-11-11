@@ -1,4 +1,4 @@
-# 평가 지표 정의 (evalkit) — 초안 v0.5
+# 평가 지표 정의 (evalkit) — 초안 v0.6
 
 - 상태: **초안. 연구 1팀 서명 대기**(연구 1팀 검토 회신 `받은 자료/연구 1팀/evalkit_지표_검토_회신.md`와 2·3차 회신[1-8 분할: 빈 트랙 축 1 유지·악기 축 3, key_match 분리, 3-8a/3-8b] 반영, 서명은 배채린 님이 임계값을 확인한 뒤). 연구 1팀 `자동채점_항목_정리.md`(26항목) **수령함**(받은 자료/연구 1팀/자동채점_항목_정리.md, 2026-11-11). 그 번호와 이 문서의 지표 이름의 대응은 7절, `results.csv` 열의 대응은 8절. 지금 지표 목록은 합의안(`docs/프롬프트투미디/2단계-계획서-합의안.md` 2절, 8절 '지표 정의 문서')의 "지금 가능" 항목에서 개발 1팀이 먼저 정리한 것이다. 항목 선정·임계값 검토는 연구 1팀, 문서화·구현은 개발 1팀.
 - 구현: `src/prompt2midi/evalkit/` · 실행: `python -m prompt2midi.evalkit <세트.json> --provider rule|fake [--out DIR] [--fallback]`
@@ -54,7 +54,7 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 ## 3. 출력
 
 `--out DIR`(기본 `out/evalkit`, `.gitignore` 대상)에 두 파일을 쓴다.
-- `results.csv`: 프롬프트별 한 줄. **열 순서: (v0.1 열 그대로) → [v0.2] `provider`, `labels`, 수치 지표의 `<지표>_value`(`tempo_match`, `scale_deviation`, `pitch_range`, `bars_match`, `bars_min`), `axis1_ok`, 별칭 `곡ID`, `언어` → [v0.3] `no_empty_tracks_value`, `midi_instruments_included_value` → [v0.5] `expr_*` 10개(표현력 대리 지표 값, 5절 뒤 5-1).** 기존 열 이름·순서는 바꾸지 않았고(시험이 고정), 새 열은 모두 끝에 붙는다. 측정 시각 열은 없다.
+- `results.csv`: 프롬프트별 한 줄. **열 순서: (v0.1 열 그대로) → [v0.2] `provider`, `labels`, 수치 지표의 `<지표>_value`(`tempo_match`, `scale_deviation`, `pitch_range`, `bars_match`, `bars_min`), `axis1_ok`, 별칭 `곡ID`, `언어` → [v0.3] `no_empty_tracks_value`, `midi_instruments_included_value` → [v0.6] `proxy_*` 43개(대리 지표 M1~M7: 판정 `in_range/out_of_range/na`, 사유, 값 열; 5-1절).** 기존 열 이름·순서는 바꾸지 않았고(시험이 고정), 새 열은 모두 끝에 붙는다. 측정 시각 열은 없다.
   - `provider`: 요청한 공급자. `labels`: 라벨이 있는 필드 이름(`;` 구분). `<지표>_value`: 측정한 숫자(템포는 MIDI 의 BPM, 음계 이탈·음역은 비율, 마디는 마디 수), 측정하지 않았으면 빈 칸.
   - `axis1_ok`: 생성에 성공했고 축 1 지표(`midicheck_valid`, `pitch_range`, `note_integrity`, `no_empty_tracks`, `bars_min`)가 모두 pass 또는 na. **1-8 은 분할**한다(연구 1팀 3차 회신): 빈 트랙(`no_empty_tracks`)은 파일 구조 결함이라 축 1 에 두고, 악기 구성(`midi_instruments_included`)만 축 1 에서 빼 축 3(3-7)으로 집계한다. 값은 `no_empty_tracks_value`(빈 트랙 수)·`midi_instruments_included_value`(라벨 악기 중 MIDI 에 있는 비율)에 기록한다. `deterministic` 은 하네스 속성이라 어느 축에도 넣지 않았다.
   - `곡ID`, `언어`: 연구 1팀 제안 이름의 별칭(`id`, `lang` 과 같은 값).
@@ -70,8 +70,14 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 - **Intent v1 (문장에서 뽑은 필드의 일치율, 연구 1팀 3-1)**: Intent 스키마가 아직 없어 넣지 않았다. 들어올 자리: `evalkit/metrics.py` 의 `METRICS` 에 새 `Metric` 을 추가하고, `Context` 에 추출된 intent 를 담을 필드를 더하면 된다. `expect` 라벨은 이미 같은 이름(tonic·mode·tempo_bpm·time_signature·bars·instruments)을 쓰므로 추출 일치율과 MIDI 속성 일치율을 **따로** 보고할 수 있다(합의안 4절 위험 1).
 - 연구 1팀 26항목 중 '지금 가능' 항목: 번호 대응표를 받으면 이 표에 열을 추가한다.
 
-### 5-1. 표현력 대리 지표 (v0.5, 3단계 기준선 P0)
-`src/prompt2midi/evalkit/expressiveness.py`. 선율 반복률, 반복 리듬 마디의 변주 정도, 순차·도약 비율, 윤곽 다양성, 종지음=으뜸음, 섹션 간 밀도·음역 차, 코드 간 평균 이동 거리, 음계 이탈률. **합격 판정이 없는 값 열**(CSV 맨 끝 `expr_*`, 측정 불가는 빈 칸)이며 `axis1_ok`·집계에 들어가지 않는다. 각 함수 docstring 에 '대리하는 속성과 한계'가 있다. 정의는 보수적인 첫 버전이고 연구 1팀 정의 문서가 오면 맞춘다. 기준선 값과 해석은 `docs/baseline-expressiveness-v0.md`, 샘플 MIDI 는 `data/samples/baseline-v0/`. **이 값을 음악 품질로 보고하지 않는다.**
+### 5-1. 대리 지표 M1~M7 (v0.6, 3단계 기준선 P0 — 연구 1팀 정의서 `자동_대리지표_정의.md`)
+`src/prompt2midi/evalkit/proxy.py`. M1 선율 반복률·변주, M2 음정 분포, M3 윤곽 다양성, M4 종지음 도착, M5 섹션 간 밀도·음역 차이, M6 코드 간 평균 이동 거리, M7 음계 이탈률. 정의서의 수식·시험 벡터로 구현(`tests/test_proxy.py`).
+- **판정 이름은 `in_range / out_of_range / na`** 이며 pass/fail 이 아니다. pass/fail 집계·`axis1_ok` 에 섞지 않는다. CSV 맨 끝에 지표마다 `proxy_<m>`(판정), `proxy_<m>_reason`, `proxy_<m>_<값 이름>`(값, 측정 불가는 빈 칸).
+- **임계값은 `proxy.py` 의 `THRESH` 표 한 곳에만 있고 전부 임시값**이다(근거·보정 없음). **청취 상관 검증(곡 30개 이상, Spearman |ρ| ≥ 0.3) 전에는 품질의 근거나 서명 지표로 쓰지 않는다.** 규칙 변경 전/후 비교와 회귀 탐지용이며, 곡의 우열 판정이나 최적화 목표로 쓰지 않는다.
+- `midicheck_valid` 또는 `note_integrity` 가 실패한 곡은 전부 `na`(사유 "유효성 실패"). 조는 MIDI 에서 추정하지 않는다(사양의 조, 없으면 세트의 라벨). 섹션·코드 이름은 사양이 있는 우리 출력에서만(M5·M6), 외부 MIDI 는 `na`.
+- 우리 `Mode` 7종에 맞춰 `harmonic_minor`(간격 {0,2,3,5,7,8,11}, 3도 3반음·5도 7반음)를 M4·M7 표에 추가했다.
+- `deterministic` 은 같은 입력에서 이 지표 값까지 같은지 확인한다. 기존 `scale_deviation`(pass/fail)은 그대로이며 M7 이 대체하지 않는다.
+- 이전 PR(#32, v0.5)의 단순 `expr_*` 10개 열은 이 정의서 기준 지표로 **대체**했다(병합 직후라 소비자가 없음). 기준선 값과 해석: `docs/baseline-expressiveness-v0.md`. **이 값을 음악 품질로 보고하지 않는다.**
 
 ## 6. 서명 확인 사항 (연구 1팀 회신 2026-11-11 반영)
 

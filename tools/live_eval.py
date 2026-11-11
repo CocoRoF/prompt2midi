@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from prompt2midi.api.config import AppSettings  # noqa: E402
 from prompt2midi.api.store import Store  # noqa: E402
 from prompt2midi.evalkit import EvalItem, EvalSet, SetError, load_set  # noqa: E402
-from prompt2midi.evalkit.expressiveness import measure  # noqa: E402
-from prompt2midi.evalkit.metrics import METRICS, Context  # noqa: E402
+from prompt2midi.evalkit.metrics import METRICS, Context, midicheck_valid, note_integrity  # noqa: E402
+from prompt2midi.evalkit.proxy import evaluate as evaluate_proxies  # noqa: E402
 from prompt2midi.evalkit.report import summary_md, write_csv  # noqa: E402
 from prompt2midi.evalkit.runner import ItemResult, labels_of  # noqa: E402
 from prompt2midi.evalkit.version import EVALKIT_VERSION  # noqa: E402
@@ -142,7 +142,7 @@ def score_item(item: EvalItem, provider: str, provider_obj, max_retries: int, ke
         item.id, item.lang, item.tier, midi is not None, provider, labels_of(item), err, used if midi is not None else "", attempts, fb,
         total_bars(spec) if spec is not None else None, hashlib.sha256(midi).hexdigest()[:8] if midi else "",
         {m.name: m.fn(ctx) for m in METRICS},
-        measure(midi, spec, item.expect),   # evalkit 0.5: expressiveness proxy values, same as run_set
+        evaluate_proxies(midi, spec, item.expect, midi is not None and midicheck_valid(ctx).status != "fail" and note_integrity(ctx).status != "fail"),  # same rule as run_set
     )
     record = {"id": item.id, "generated": midi is not None, "attempts": attempts, "error": err,
               "spec": spec.model_dump(mode="json", by_alias=True) if spec is not None else None}

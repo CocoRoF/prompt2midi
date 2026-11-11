@@ -4,7 +4,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .metrics import AXIS1_METRICS, AXIS23_METRICS, FAIL, LISTEN_COLUMNS, METRICS, NA, PASS, TEMPO_TOLERANCE_BPM, VALUE_METRICS
+from .metrics import AXIS1_METRICS, AXIS23_METRICS, DISPLAY_TITLES, EXTRACTION_METRICS, FAIL, LISTEN_COLUMNS, METRICS, NA, PASS, TEMPO_TOLERANCE_BPM, VALUE_METRICS, VALUE_METRICS_V03
 from .runner import ItemResult
 from .version import EVALKIT_VERSION
 
@@ -23,7 +23,7 @@ def columns() -> list[str]:
         cols += [m.name, m.name + "_reason"]
     cols += list(LISTEN_COLUMNS) + EXTRA_HEAD
     cols += [name + "_value" for name in VALUE_METRICS] + ["axis1_ok"]
-    return cols + list(ALIASES)
+    return cols + list(ALIASES) + [name + "_value" for name in VALUE_METRICS_V03]
 
 
 def axis1_ok(r: ItemResult) -> bool:
@@ -43,7 +43,7 @@ def rows(results: list[ItemResult]) -> list[dict]:
         for c in LISTEN_COLUMNS:
             row[c] = LISTEN_TEXT
         row["provider"], row["labels"] = r.provider, ";".join(r.labels)
-        for name in VALUE_METRICS:
+        for name in (*VALUE_METRICS, *VALUE_METRICS_V03):
             v = r.results[name].value
             row[name + "_value"] = "" if v is None else v
         row["axis1_ok"] = axis1_ok(r)
@@ -93,20 +93,27 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
         f"- `evalkit_version` {EVALKIT_VERSION} · 세트: `{set_name}` ({n}개, 파일 sha256 앞 8자 `{set_sha[:8]}`) · 공급자: `{provider}` · 폴백: {'켬' if fallback else '끔(공급자만 측정)'}",
         f"- 허용오차: 템포 {tempo_text} · 마디 수 정확 일치 · 음계 이탈 ≤10% · 악기 음역 밖 ≤5% · 길이 ≥8마디",
         f"- 유효 곡 비율: 생성 성공 {gen}/{n} · 축 1 통과(`axis1_ok`) {len(ok1)}/{n}. 시각·시간 값은 넣지 않는다(같은 코드·같은 세트면 같은 파일).",
-        "", "## 지표별 통과 비율", "",
+        "", "## 곡(MIDI) 지표별 통과 비율", "",
         "셀 = `통과/분모 (비율)`. **분모는 pass+fail 만**이고, 라벨이 없거나 해당 없는 항목(`na`)은 분모에서 뺀 뒤 `· na N` 으로 따로 적는다. 분모가 0이면 `—`.",
         f"음계 이탈(2-3)은 tonic·mode 라벨이 **둘 다 있는 항목만** 채점한다: 이 세트에서 {with_key}/{n}개.", "",
         "| 지표 | " + " | ".join(g for g, _ in groups) + " |", "|---|" + "---|" * len(groups),
         f"| 프롬프트 수 | " + " | ".join(str(len(g)) for _, g in groups) + " |",
     ]
+    titles = {m.name: DISPLAY_TITLES.get(m.name, m.title) for m in METRICS}
     for m in METRICS:
-        lines.append(f"| {m.title} (`{m.name}`) | " + " | ".join(_cell(g, m.name) for _, g in groups) + " |")
+        if m.name not in EXTRACTION_METRICS:
+            lines.append(f"| {titles[m.name]} (`{m.name}`) | " + " | ".join(_cell(g, m.name) for _, g in groups) + " |")
+    lines += ["", "## 사양 추출 일치 (라벨 ↔ 사양 선언)", "",
+              "곡(MIDI)이 아니라 **문장에서 뽑아 사양에 적은 값**이 라벨과 맞는지 본다. 연구 1팀 축 2·3 이 아니며 축 1 통과 여부로 거르지 않는다(모든 곡 대상, 분모 규칙은 위와 같다). `조성 선언 일치`는 연구 1팀 2-2(사양 조 ↔ 곡에서 추정한 조)와 **다른 지표**다.",
+              "<!-- Intent v1 일치율 지표(연구 1팀 3-1)가 들어올 자리: metrics.EXTRACTION_METRICS 에 추가하면 이 표에 나온다 -->", "",
+              "| 지표 | " + " | ".join(g for g, _ in groups) + " |", "|---|" + "---|" * len(groups)]
+    for name in EXTRACTION_METRICS:
+        lines.append(f"| {titles[name]} (`{name}`) | " + " | ".join(_cell(g, name) for _, g in groups) + " |")
     ok_groups = [(g, [r for r in rs if axis1_ok(r)]) for g, rs in groups]
     lines += ["", "## 축 1 통과 곡만의 집계 (축 2·3 지표)", "",
-              "연구 1팀 규칙: 축 1(MIDI 유효성) 실패 곡은 이후 축 2·3 집계에서 뺀다. 축 1 = " + ", ".join(f"`{m}`" for m in AXIS1_METRICS) + " (모두 pass 또는 na). 악기 지표는 축 3 이라 축 1 에 넣지 않는다. 분모 규칙은 위와 같다.", "",
+              "연구 1팀 규칙: 축 1(MIDI 유효성) 실패 곡은 이후 축 2·3 집계에서 뺀다. 축 1 = " + ", ".join(f"`{m}`" for m in AXIS1_METRICS) + " (모두 pass 또는 na). 1-8(빈 트랙·악기 구성)은 축 1 집계에서 제외하고 `no_empty_tracks_value`·`midi_instruments_included_value` 열에만 기록하며, 악기 일치는 축 3(3-7)으로만 집계한다. 사양 추출 지표는 이 표에 넣지 않는다(위 절). 분모 규칙은 위와 같다.", "",
               "| 지표 | " + " | ".join(g for g, _ in ok_groups) + " |", "|---|" + "---|" * len(ok_groups),
               "| 축 1 통과 곡 수 / 전체 | " + " | ".join(f"{len(rs)}/{len(all_g)}" for (_, rs), (_, all_g) in zip(ok_groups, groups)) + " |"]
-    titles = {m.name: m.title for m in METRICS}
     for name in AXIS23_METRICS:
         lines.append(f"| {titles[name]} (`{name}`) | " + " | ".join(_cell(rs, name) for _, rs in ok_groups) + " |")
     lines += ["", "## 재시도·폴백 (참고, 합격 판정 아님)", "",
@@ -121,6 +128,6 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
     lines += ["", "## 읽는 법과 한계", "",
               "- 자동 지표는 프롬프트에 **글자로 적힌 속성**이 결과에 반영됐는지만 본다. 음악이 좋은지, 분위기가 맞는지는 보지 않는다.",
               "- 템포·조성·박자표·마디·악기는 라벨이 있는 프롬프트만 채점한다. 라벨이 적은 세트에서는 분모가 작아 비율이 크게 흔들린다.",
-              "- 악기 포함은 사양의 트랙 악기를 기준으로 한다(MIDI 프로그램 번호 직접 검사는 하지 않음).",
+              "- `악기 선언 일치`는 사양의 트랙 악기 기준(사양 추출), `악기 포함(MIDI 프로그램)`은 MIDI 프로그램 번호 기준(곡)이다.",
               "- 정의·합격 판정: `docs/eval-metrics.md` (연구 1팀 서명 대기).", ""]
     return "\n".join(lines)

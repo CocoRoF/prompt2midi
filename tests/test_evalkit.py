@@ -159,7 +159,7 @@ def test_summary_denominators_exclude_na(tmp_path):
     line = next(l for l in md.splitlines() if l.startswith("| 템포 일치"))
     assert line.endswith("| 1/2 (50%) · na 3 |"), line       # p1 pass, p2 fail, p3-p5 na
     assert "분모는 pass+fail 만" in md and "청취 필요" in md
-    line = next(l for l in md.splitlines() if l.startswith("| 마디 수 일치"))
+    line = next(l for l in md.splitlines() if l.startswith("| 마디 수 선언 일치"))
     assert line.endswith("| 1/3 (33%) · na 2 |"), line       # p1 pass, p2 fail, p5 fail
     assert "- `p2` · `tempo_match`:" in md
     # tier x language columns exist
@@ -323,6 +323,10 @@ V01_COLUMNS = (  # the columns of PR #21/#23, in order: they must stay the first
 )
 
 
+V02_COLUMNS = V01_COLUMNS + ["provider", "labels", "tempo_match_value", "scale_deviation_value", "pitch_range_value",
+                             "bars_match_value", "bars_min_value", "axis1_ok", "곡ID", "언어"]
+
+
 def _meta(bpm):
     return [(0, mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(bpm))), (0, mido.MetaMessage("time_signature", numerator=4, denominator=4))]
 
@@ -370,8 +374,8 @@ def test_tempo_tol_rejects_nonsense(tmp_path, bad):
 def test_csv_keeps_the_old_columns_first_and_appends_the_new_ones(tmp_path):
     cols = report.columns()
     assert cols[:len(V01_COLUMNS)] == V01_COLUMNS
-    assert cols[len(V01_COLUMNS):] == ["provider", "labels", "tempo_match_value", "scale_deviation_value", "pitch_range_value",
-                                       "bars_match_value", "bars_min_value", "axis1_ok", "곡ID", "언어"]
+    assert cols[:len(V02_COLUMNS)] == V02_COLUMNS                      # v0.2 (PR #25) order is kept as well
+    assert cols[len(V02_COLUMNS):] == ["no_empty_tracks_value", "midi_instruments_included_value"]   # v0.3 additions go last
     assert not any("시각" in c or "time" in c.lower().replace("time_signature", "") for c in cols)   # still no measurement time
     out = tmp_path / "out"
     cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--out", str(out)])
@@ -426,3 +430,75 @@ def test_summary_header_and_label_count(tmp_path):
     assert "tonic·mode 라벨이 **둘 다 있는 항목만** 채점한다: 이 세트에서 2/5개" in md     # p1, p2 (p4 has only the tonic)
     import re
     assert not re.search(r"\d{4}-\d{2}-\d{2}|\d{2}:\d{2}", md)            # still no dates or times in the file
+
+
+# ---------- 연구 1팀 2차 회신: key_match 는 사양 추출 일치로 분리, 1-8 은 축 1 에서 제외 ----------
+
+def _summary(tmp_path, data=SET5, *args):
+    out = tmp_path / "out"
+    assert cli.main([str(write(tmp_path, data)), "--provider", "fake", "--out", str(out), *args]) == 0
+    return (out / "summary.md").read_text(encoding="utf-8")
+
+
+def _section(md, title):
+    return md.split(f"## {title}")[1].split("\n## ")[0]
+
+
+def test_key_match_is_a_spec_extraction_metric_not_an_axis23_metric(tmp_path):
+    md = _summary(tmp_path)
+    axis, extraction, pieces = _section(md, "축 1 통과 곡만의 집계 (축 2·3 지표)"), _section(md, "사양 추출 일치 (라벨 ↔ 사양 선언)"), _section(md, "곡(MIDI) 지표별 통과 비율")
+    for name in ("key_match", "bars_match", "instruments_included"):
+        assert f"`{name}`" in extraction and f"`{name}`" not in axis and f"`{name}`" not in pieces
+    assert "| 조성 선언 일치(사양 추출) (`key_match`) |" in extraction
+    assert "조성 일치" not in md.replace("조성 선언 일치", "")                    # the old name is gone from the summary
+    assert "연구 1팀 2-2(사양 조 ↔ 곡에서 추정한 조)와 **다른 지표**" in extraction
+    # the piece-level metrics stay where they were
+    for name in ("tempo_match", "time_signature_match", "midi_instruments_included", "scale_deviation"):
+        assert f"`{name}`" in axis and f"`{name}`" in pieces
+    # values: p1 key labels match the fake spec, p2 do not; p4 (tonic only) is judged on the tonic; p3/p5 have no key label
+    row = next(l for l in extraction.splitlines() if "`key_match`" in l)
+    assert row.endswith("| 2/3 (67%) · na 2 |"), row
+    assert md.index("## 사양 추출 일치") < md.index("## 축 1 통과 곡만의 집계")
+
+
+def test_csv_keeps_the_key_match_column_name(tmp_path):
+    out = tmp_path / "out"
+    cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--out", str(out)])
+    import csv
+    rows = list(csv.DictReader(open(out / "results.csv", encoding="utf-8")))
+    assert "key_match" in rows[0] and "key_match_reason" in rows[0]
+    assert [r["key_match"] for r in rows] == ["pass", "fail", "na", "pass", "na"]
+
+
+def test_one_eight_is_recorded_as_values_but_excluded_from_axis1():
+    from prompt2midi.evalkit.metrics import AXIS1_METRICS, AXIS23_METRICS, EXTRACTION_METRICS, Result
+    assert "no_empty_tracks" not in AXIS1_METRICS and "midi_instruments_included" not in AXIS1_METRICS
+    assert "instruments_included" not in AXIS1_METRICS and "instruments_included" not in AXIS23_METRICS   # spec-based: extraction
+    assert set(AXIS1_METRICS) == {"midicheck_valid", "pitch_range", "note_integrity", "bars_min"}
+    assert not set(EXTRACTION_METRICS) & set(AXIS23_METRICS)                       # no metric is counted in both groups
+    results = {m.name: Result("pass") for m in METRICS}
+    r = runner.ItemResult("x", "en", "A", True, "fake", [], "", "fake", 1, False, 12, "abcd1234", dict(results))
+    r.results["no_empty_tracks"] = Result("fail", "빈 트랙 1개", 1)
+    r.results["midi_instruments_included"] = Result("fail", "빠짐", 0.5)
+    assert report.axis1_ok(r) is True                                              # 1-8 failures do not drop the piece
+    r.results["bars_min"] = Result("fail")
+    assert report.axis1_ok(r) is False
+
+
+def test_one_eight_value_columns(tmp_path):
+    out = tmp_path / "out"
+    cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--out", str(out)])
+    import csv
+    rows = {r["id"]: r for r in csv.DictReader(open(out / "results.csv", encoding="utf-8"))}
+    assert all(r["no_empty_tracks_value"] == "0" for r in rows.values())
+    assert rows["p1"]["midi_instruments_included_value"] == "1.0"                  # piano + drums both in the MIDI
+    assert rows["p2"]["midi_instruments_included_value"] == "0.0"                  # violin is not
+    assert rows["p3"]["midi_instruments_included_value"] == ""                     # no label
+
+
+def test_new_summary_is_deterministic_and_has_the_new_version(tmp_path):
+    for d in ("a", "b"):
+        cli.main([str(write(tmp_path, SET5)), "--provider", "rule", "--tempo-tol", "0.1", "--out", str(tmp_path / d)])
+    for f in ("results.csv", "summary.md"):
+        assert (tmp_path / "a" / f).read_bytes() == (tmp_path / "b" / f).read_bytes()
+    assert f"`evalkit_version` {EVALKIT_VERSION}" in (tmp_path / "a" / "summary.md").read_text(encoding="utf-8") and EVALKIT_VERSION == "0.3.0"

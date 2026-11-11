@@ -113,7 +113,7 @@ def test_strong_beats_and_chord_changes_are_chord_tones(specs):
                 assert n.pitch % 12 in M.chord_tones(slots[i][2]), (sp.title, n.start, n.pitch)
 
 
-def test_weak_nonchord_tones_are_passing_or_neighbor(specs):
+def test_weak_nonchord_tones_are_passing_neighbor_or_escape(specs):
     for sp in specs:
         tr, got = _melody(_v2(sp))
         if got is None:
@@ -186,7 +186,8 @@ def test_nonchord_role_unit():
     assert M.nonchord_role(64, 62, 60) == "passing"
     assert M.nonchord_role(60, 62, 60) == "neighbor"
     assert M.nonchord_role(60, 61, 60) == "neighbor"
-    assert M.nonchord_role(60, 62, 59) is None      # no resolution
+    assert M.nonchord_role(60, 62, 59) == "escape"  # step up, leap back down
+    assert M.nonchord_role(60, 62, 66) is None      # step up then a leap further up: none of the three
     assert M.nonchord_role(60, 65, 67) is None      # leap into it
     assert M.nonchord_role(60, 60, 60) is None      # not a non-chord tone event
     assert M.nonchord_role(60, 63, 66) is None
@@ -243,7 +244,11 @@ def test_complete_cadence_in_last_section_and_half_cadence_before(specs):
             chord = next(c for s0, ln, c, _i, _s in slots if s0 <= last.start < s0 + ln)
             info = M.chord_tones_info(chord)
             if si == len(sp.sections) - 1:
-                assert last.pitch % 12 in {info.root, info.third}, (sp.title, chord, last.pitch)
+                tonic = S.PITCH_CLASS[sp.key.tonic.value]
+                iv = S.MODE_INTERVALS[sp.key.mode.value]
+                key = [tonic, (tonic + iv[2]) % 12, (tonic + iv[4]) % 12]
+                want = next((pc for pc in key if pc in info.tones), info.root)   # tonic, third, fifth, else the chord root
+                assert last.pitch % 12 == want, (sp.title, chord, last.pitch)
                 assert last.end == total, "the final note is held to the very end of the last bar"
             else:
                 assert last.pitch % 12 in info.tones
@@ -324,9 +329,23 @@ def test_snap_keeps_the_motifs_direction_and_avoids_leaps():
 def test_cadence_pitch_unit():
     c = M.chord_tones_info("C")
     assert (c.root, c.third, c.fifth) == (0, 4, 7)
-    assert M._cadence_pitch(c, 62, 64, True, 48, 84) == 60               # complete: the root nearest the line
-    assert M._cadence_pitch(c, 62, 71, True, 48, 84) == 64               # the root would leap > a fifth: the third
     assert M._cadence_pitch(c, 62, 64, False, 48, 84) == 67              # half cadence: the fifth
-    # chord without a fifth in its tone list still returns a chord tone
     d = M.chord_tones_info("Bdim")
-    assert M._cadence_pitch(d, 62, None, False, 48, 84) % 12 in d.tones
+    assert M._cadence_pitch(d, 62, None, False, 48, 84) % 12 in d.tones  # a chord without a perfect fifth still gives a chord tone
+    # complete cadence: tonic if a chord tone; else the key's third, then fifth; else the chord root
+    C_MAJOR = (0, 4, 7)
+    def end(chord, cur=62, key=C_MAJOR):
+        return M._cadence_pitch(M.chord_tones_info(chord), cur, None, True, 48, 84, key) % 12
+    assert end("F") == 0        # IV  (F A C): the tonic C is a chord tone
+    assert end("Am") == 0       # vi  (A C E): the tonic again
+    assert end("C") == 0        # I
+    assert end("G") == 7        # V   (G B D): no tonic, no key third (E); the key fifth G
+    assert end("Em") == 4       # iii (E G B): no tonic; the key third E comes before the fifth G
+    assert end("Dm") == 2       # ii  (D F A): none of C/E/G -> the chord root
+    assert end("Bdim") == 11    # vii: none of C/E/G -> the chord root
+    # minor key (A minor: tonic A, third C, fifth E): IV = Dm (D F A) -> the tonic A
+    assert end("Dm", key=(9, 0, 4)) == 9
+    assert end("G", key=(9, 0, 4)) == 7     # VII (G B D): none -> the root
+    # the closest octave to the line is used
+    assert M._cadence_pitch(M.chord_tones_info("F"), 70, None, True, 48, 84, C_MAJOR) == 72
+    assert M._cadence_pitch(M.chord_tones_info("F"), 62, None, True, 48, 84, C_MAJOR) == 60

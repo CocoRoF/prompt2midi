@@ -76,12 +76,14 @@ def phrase_role(index: int, count: int) -> str:
 
 def nonchord_role(prev: int, n: int, nxt: int) -> str | None:
     """Classify a non-chord tone between two neighbours: 'passing' (stepwise, same direction), 'neighbor'
-    (step away and back) or None (neither: it must be moved onto a chord tone)."""
+    (step away and back), 'escape' (step away, leap back the other way) or None (it must be moved onto a chord tone)."""
     d1, d2 = n - prev, nxt - n
     if d1 and d2 and (d1 > 0) == (d2 > 0) and abs(d1) <= MAX_PASSTHROUGH and abs(d2) <= MAX_PASSTHROUGH:
         return "passing"
     if prev == nxt and 1 <= abs(d1) <= MAX_PASSTHROUGH:
         return "neighbor"
+    if d1 and d2 and (d1 > 0) != (d2 > 0) and abs(d1) <= MAX_PASSTHROUGH and abs(d2) > MAX_PASSTHROUGH:
+        return "escape"     # step away, then a leap back the other way to a chord tone (escape tone / échappée)
     return None
 
 
@@ -123,18 +125,27 @@ def chord_tones_info(chord: str) -> _ChordInfo:
     return _ChordInfo(root, third, fifth, frozenset((root + i) % 12 for i in ivs))
 
 
-def _cadence_pitch(info: _ChordInfo, cur: int, prev: int | None, complete: bool, lo: int, hi: int) -> int:
-    """Final note of a section: complete cadence = root (the third if the root would leap more than a fifth), half
-    cadence = the fifth (or the third / any non-root chord tone). Always the pitch closest to `cur`."""
+def _cadence_pitch(info: _ChordInfo, cur: int, prev: int | None, complete: bool, lo: int, hi: int,
+                   key_pcs: tuple[int, int, int] | None = None) -> int:
+    """Final note of a section, always a chord tone of its last chord, as close to `cur` as possible.
+
+    Complete cadence (the last section), first match wins: the key's tonic if it is a chord tone; else the key's
+    third, then fifth if one is; else the chord's root. `key_pcs` = (tonic, third, fifth) pitch classes of the key.
+    Half cadence (earlier sections): the chord's fifth, else its third, else any non-root chord tone."""
     def nearest(pcs: list[int]) -> int | None:
         c = [p for p in range(lo, hi + 1) if p % 12 in pcs]
         return min(c, key=lambda p: (abs(p - cur), abs(p - prev) if prev is not None else 0, -p)) if c else None
 
     if complete:
-        r, t = nearest([info.root]), nearest([info.third] if info.third is not None else [])
-        if r is not None and (prev is None or abs(r - prev) <= 7 or t is None or abs(t - prev) > 7):
-            return r
-        return t if t is not None else cur
+        order = [[info.root]]
+        if key_pcs is not None:
+            tonic, third, fifth = key_pcs
+            order = [[x] for x in (tonic, third, fifth) if x in info.tones] + order
+        for pcs in order:
+            got = nearest(pcs)
+            if got is not None:
+                return got
+        return cur
     pick = nearest([info.fifth] if info.fifth is not None else []) or nearest(
         [x for x in (info.third,) if x is not None]) or nearest(sorted(info.tones - {info.root}))
     return pick if pick is not None else cur
@@ -294,6 +305,7 @@ def build_melody(
     def _want(j: int) -> int:
         return (pitches[j] > pitches[j - 1]) - (pitches[j] < pitches[j - 1]) if j else 0
     scale_pcs = {(base + iv[i]) % 12 for i in range(7)}
+    key_triad = (base % 12, (base + iv[2]) % 12, (base + iv[4]) % 12)   # tonic, third, fifth of the key
     last_sec = len(spec.sections) - 1
     phrase_last = {j for j in range(n) if j + 1 == n or line[j + 1].phrase != line[j].phrase}
     sec_last = {j for j in phrase_last if spans[line[j].phrase][3] != (line[j + 1].sec if j + 1 < n else -1)}
@@ -315,7 +327,7 @@ def build_melody(
             final[j] = _snap(final[j], tones[j], lo, hi, final[j - 1] if j else None)
         if j in sec_last:
             final[j] = _cadence_pitch(chord_tones_info(slots[slot_of(line[j].t)][2]), final[j], final[j - 1] if j else None,
-                                      line[j].sec == last_sec, lo, hi)
+                                      line[j].sec == last_sec, lo, hi, key_triad)
         pinned.add(j)
         if j >= 2 and not strong[j - 1] and line[j - 1].phrase == line[j].phrase and abs(final[j] - final[j - 1]) > MAX_PASSTHROUGH:
             for c in sorted((final[j] + d for d in (-2, -1, 1, 2)), key=lambda c: (abs(c - final[j - 1]), -c)):
@@ -349,14 +361,14 @@ def build_melody(
         changed = False
         for j in range(1, n - 1):
             leap = final[j] - final[j - 1]
-            if abs(leap) < LEAP_MIN or j + 1 in pinned or strong[j + 1]:
+            if abs(leap) < LEAP_MIN or j + 1 in pinned:
                 continue
             back = final[j + 1] - final[j]
             if back * leap < 0:
                 continue
             sign = -1 if leap > 0 else 1
             choice = None
-            if j + 2 < n and is_ct(j) and is_ct(j + 2):
+            if not strong[j + 1] and j + 2 < n and is_ct(j) and is_ct(j + 2):
                 for d in (1, 2):
                     c = final[j] + sign * d
                     if lo <= c <= hi and c % 12 in scale_pcs and nonchord_role(final[j], c, final[j + 2]) is not None:
@@ -368,6 +380,20 @@ def build_melody(
                     choice = min(cand, key=lambda p: (abs(p - final[j]), -p))
             if choice is not None and choice != final[j + 1]:
                 final[j + 1], changed = choice, True
+        return changed
+
+    def smooth_leaps() -> bool:
+        """A leap INTO a weak, unpinned note is replaced by a closer chord tone (or passing/neighbour note) when one exists."""
+        changed = False
+        for j in range(1, n):
+            if abs(final[j] - final[j - 1]) < LEAP_MIN or strong[j] or j in pinned or line[j].op == "orig":
+                continue
+            cand = [p for p in range(max(lo, final[j - 1] - LEAP_MIN + 1), min(hi, final[j - 1] + LEAP_MIN - 1) + 1)
+                    if p != final[j - 1] and p % 12 in tones[j]]
+            if cand:
+                want = _want(j)
+                final[j] = min(cand, key=lambda p: (abs(p - pitches[j]) + CONTOUR_COST * (want and ((p > final[j - 1]) - (p < final[j - 1])) != want), -p))
+                changed = True
         return changed
 
     def repair_weak() -> bool:
@@ -391,6 +417,7 @@ def build_melody(
                     final[j], changed = c, True
         return changed
 
+    smooth_leaps()
     recover_leaps()
     for _ in range(6):
         if not (repair_weak() | clamp_octave()):

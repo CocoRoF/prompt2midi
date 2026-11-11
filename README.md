@@ -91,3 +91,4 @@ Docker: `docker stop prompt2midi && docker run --rm -v p2m-data:/data busybox rm
 - **uvicorn 의 proxy 헤더 처리는 끈다(`python -m prompt2midi.api` 가 자동으로, `uvicorn` 직접 실행이면 `--no-proxy-headers`).** uvicorn 은 기본으로 127.0.0.1 에서 온 `X-Forwarded-*` 를 믿고 클라이언트 주소를 바꾼다. 그러면 `P2M_TRUST_PROXY` 를 켜지 않았어도 같은 호스트의 프록시가 전달한 헤더로 IP 가 바뀌어, 앱이 헤더 처리를 직접 하는 위 규칙과 어긋난다. Docker 이미지는 `python -m prompt2midi.api` 로 시작한다. 직접 `uvicorn` 을 쓰면 `--no-proxy-headers` 를 붙인다.
 - `/data` 를 백업하고 접근 권한을 제한한다(키가 들어 있다).
 - 환경변수와 구현 세부: [`docs/api-and-admin.md`](docs/api-and-admin.md) 9절.
+- 실제 LLM 평가(키 등록·비용 상한을 사람이 정한 뒤): `tools/live_eval.py`(기본 드라이런, 단계 5→20→전체, `--yes-spend --max-calls N` 과 `P2M_LIVE=1` 이 모두 있어야 호출). 사람이 할 일의 순서: [`docs/live-eval-checklist.md`](docs/live-eval-checklist.md).

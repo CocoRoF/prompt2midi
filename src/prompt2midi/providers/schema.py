@@ -39,8 +39,21 @@ def _drop_noise(node: dict) -> dict:
     return {k: v for k, v in node.items() if k not in ("default", "examples")}
 
 
+# MusicSpec fields the model must not write (chosen by code/people, not by the LLM).
+LLM_HIDDEN_FIELDS = ("engine",)
+
+
+def _hide_fields(schema: dict[str, Any]) -> dict[str, Any]:
+    props = schema.get("properties", {})
+    for name in LLM_HIDDEN_FIELDS:
+        props.pop(name, None)
+    if "required" in schema:
+        schema["required"] = [r for r in schema["required"] if r not in LLM_HIDDEN_FIELDS]
+    return schema
+
+
 def base_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    return _walk(copy.deepcopy(schema), lambda n: _drop_noise(_tuples_to_arrays(n)))
+    return _hide_fields(_walk(copy.deepcopy(schema), lambda n: _drop_noise(_tuples_to_arrays(n))))
 
 
 def schema_for_anthropic(schema: dict[str, Any]) -> dict[str, Any]:

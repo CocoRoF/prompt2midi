@@ -262,6 +262,9 @@ class MusicSpec(_Strict):
     version: Literal["1"] = SPEC_VERSION
     title: str = Field(min_length=1, max_length=60)
     seed: Seed | None = None
+    # Opt-in generation engine. None / "v1" = the original compiler (byte-identical output); "v2" = expressive
+    # compiler (docs/compiler-v2.md). Not part of the LLM schema and not part of the content hash.
+    engine: Literal["v1", "v2"] | None = None
     tempo_bpm: int = Field(ge=40, le=220)
     time_signature: tuple[int, int] = (4, 4)
     key: Key
@@ -299,9 +302,14 @@ def duration_seconds(spec: MusicSpec) -> float:
     return float(total_bars(spec) * beats_per_bar(spec) * 60 / spec.tempo_bpm)
 
 
+# Fields that never enter the content hash: `seed` is what the hash replaces; `engine` and later opt-in fields must
+# not change the derived seed (old specs keep their bytes, and v1/v2 of one spec share a seed for before/after pairs).
+HASH_EXCLUDED_FIELDS = frozenset({"seed", "engine"})
+
+
 def canonical_json(spec: MusicSpec) -> str:
     """Stable serialisation (sorted keys, no whitespace) used for hashing."""
-    return json.dumps(spec.model_dump(mode="json", by_alias=True, exclude={"seed"}), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(spec.model_dump(mode="json", by_alias=True, exclude=set(HASH_EXCLUDED_FIELDS)), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def effective_seed(spec: MusicSpec) -> int:

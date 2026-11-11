@@ -234,6 +234,7 @@ def compile_spec(spec: MusicSpec, seed: int | None = None) -> bytes:
     for track in sorted(spec.tracks, key=lambda t: CHANNEL[t.role.value]):
         role = track.role.value
         rng = Rng(base_seed, role)
+        # engine "v2" (docs/compiler-v2.md) delegates to the v1 builders until its PRs land; None/"v1" is v1.
         if track.role is Role.melody:
             notes = _melody_track(spec, track, rng)
         elif track.role is Role.bass:

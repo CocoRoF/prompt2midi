@@ -275,6 +275,22 @@
   },
   "additionalProperties": false,
   "properties": {
+    "engine": {
+      "anyOf": [
+        {
+          "enum": [
+            "v1",
+            "v2"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engine"
+    },
     "key": {
       "$ref": "#/$defs/Key"
     },

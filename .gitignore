@@ -7,3 +7,6 @@ __pycache__/
 out/
 instance/
 *.key
+
+# 보류(holdout) 평가 세트는 레포에 두지 않는다 (개발 1팀은 열지 않는다. docs/eval-metrics.md)
+data/eval/holdout*

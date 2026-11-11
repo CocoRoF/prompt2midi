@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from statistics import median
 from pathlib import Path
 
@@ -60,6 +61,26 @@ def rows(results: list[ItemResult]) -> list[dict]:
             row[alias] = row[src]
         out.append(row)
     return out
+
+
+DETAILS_FILE = "proxy_details.jsonl"
+DETAIL_METRICS = ("m5", "m6")
+
+
+def details_jsonl(results: list[ItemResult]) -> str:
+    """One JSON line per piece with the per-pair (M5) and per-slot (M6) records. Same input -> same bytes (sorted keys, no times)."""
+    lines = []
+    for r in results:
+        rec = {"id": r.id, "lang": r.lang, "tier": r.tier, "provider": r.provider}
+        for k in DETAIL_METRICS:
+            res = r.proxy.get(k)
+            rec[k] = {"status": res.status if res else P.NA, "reason": res.reason if res else "", "details": res.details if res else {}}
+        lines.append(json.dumps(rec, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return "\n".join(lines) + "\n"
+
+
+def write_details(results: list[ItemResult], path: Path) -> None:
+    path.write_text(details_jsonl(results), encoding="utf-8")
 
 
 def write_csv(results: list[ItemResult], path: Path) -> None:
@@ -132,7 +153,7 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
     lines += ["", "## 대리 지표 M1~M7 — 합격 판정이 아님", "",
               "연구 1팀 정의서(`자동_대리지표_정의.md`)의 대리 지표. 판정 이름은 `in_range`/`out_of_range`/`na` 이며 **pass/fail 집계, `axis1_ok` 와 섞지 않는다.** "
               "**범위(임계값)는 전부 임시값이고 청취 상관 검증 전에는 음악 품질의 근거나 서명 지표로 쓰지 않는다.** 규칙 변경 전/후 비교와 회귀 탐지용. "
-              "`midicheck_valid`·`note_integrity` 실패 곡은 `na`. 정의·한계: `src/prompt2midi/evalkit/proxy.py`, 해석: `docs/baseline-expressiveness-v0.md`. CSV 열은 `proxy_` 로 시작한다.", "",
+              "`midicheck_valid`·`note_integrity` 실패 곡은 `na`. **M5 의 d_* 열은 인접 섹션 쌍 중 최댓값, M6 은 평균이며, 쌍별·슬롯별 값은 `proxy_details.jsonl` 에 있다.** 정의·한계: `src/prompt2midi/evalkit/proxy.py`, 해석: `docs/baseline-expressiveness-v0.md`. CSV 열은 `proxy_` 로 시작한다.", "",
               "| 지표 | in_range | out_of_range | na | 범위 안 비율(분모=in+out) |", "|---|---|---|---|---|"]
     for key, title, _fn, _names in P.PROXIES:
         st = [r.proxy[key].status if key in r.proxy else P.NA for r in results]

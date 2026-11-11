@@ -22,6 +22,7 @@ from ..spec import (
 )
 from ..validate.theory import CHORD_TONES, check_theory
 from . import drums as D
+from .harmony_v2 import bass_slot_plan, playing_slots, scale_pcs
 from .melody_v2 import build_melody
 from .voicing_v2 import next_voicing
 from .rng import Rng
@@ -83,13 +84,13 @@ def _chord_pitches(name: str, lo: int, hi: int, center: float) -> list[int]:
     return sorted(out)
 
 
-def _chords_track(spec: MusicSpec, track: Track, rng: Rng, pad: bool) -> list[_Note]:
+def _chords_track(spec: MusicSpec, track: Track, rng: Rng, pad: bool, slots=None) -> list[_Note]:
     lo, hi = effective_register(track)
     beat = _ticks(Fraction(1))
     notes: list[_Note] = []
     center = (lo + hi) / 2
     voiced = None   # engine "v2": the previous voicing (minimal-movement voice leading, compiler/voicing_v2.py)
-    for start, length, chord, _si, sec in _slots(spec):
+    for start, length, chord, _si, sec in (slots if slots is not None else _slots(spec)):
         if spec.engine == "v2":
             voiced = next_voicing(chord, lo, hi, voiced)
             pitches = list(voiced)
@@ -109,15 +110,22 @@ def _chords_track(spec: MusicSpec, track: Track, rng: Rng, pad: bool) -> list[_N
     return notes
 
 
-def _bass_track(spec: MusicSpec, track: Track, rng: Rng) -> list[_Note]:
+def _bass_track(spec: MusicSpec, track: Track, rng: Rng, slots=None) -> list[_Note]:
     lo, hi = effective_register(track)
     beat = _ticks(Fraction(1))
     notes: list[_Note] = []
-    for start, length, chord, _si, sec in _slots(spec):
+    slots = slots if slots is not None else list(_slots(spec))
+    v2 = spec.engine == "v2"
+    scale = scale_pcs(spec) if v2 else None
+    for n, (start, length, chord, _si, sec) in enumerate(slots):
         root_pc, _q = parse_chord(chord)
         root = lo + (root_pc - lo) % 12
         fifth = root + 7 if root + 7 <= hi else root
-        if sec.energy < 0.5:
+        if v2:   # engine "v2": fifths only from the 3rd beat (max 2 per slot), approach note into the next root (compiler/harmony_v2.py)
+            nxt = slots[n + 1][2] if n + 1 < len(slots) else None
+            next_root = None if nxt is None else lo + (parse_chord(nxt)[0] - lo) % 12
+            plan = bass_slot_plan(start, length, root, fifth, next_root, sec.energy, beat, lo, hi, scale, rng)
+        elif sec.energy < 0.5:
             plan = [(start, length, root)]
         else:
             plan = []
@@ -130,8 +138,8 @@ def _bass_track(spec: MusicSpec, track: Track, rng: Rng) -> list[_Note]:
     return notes
 
 
-def _melody_track_v2(spec: MusicSpec, track: Track, seed: int) -> list[_Note] | None:
-    got = build_melody(spec, track, seed, list(_slots(spec)), _ticks(beats_per_bar(spec)), PPQ, lambda energy, rng: _vel(65, energy, rng))
+def _melody_track_v2(spec: MusicSpec, track: Track, seed: int, slots) -> list[_Note] | None:
+    got = build_melody(spec, track, seed, slots, _ticks(beats_per_bar(spec)), PPQ, lambda energy, rng: _vel(65, energy, rng))
     return None if got is None else [_Note(n.start, n.end, n.pitch, n.velocity) for n in got]
 
 
@@ -243,20 +251,25 @@ def compile_spec(spec: MusicSpec, seed: int | None = None) -> bytes:
     meta.append(mido.MetaMessage("end_of_track", time=total))
     mid.tracks.append(meta)
 
+    # one slot list for melody, chords and bass: v2 plays substituted / cadential chords (the spec's chords stay as written)
+    slots = list(_slots(spec))
+    if spec.engine == "v2":
+        slots = playing_slots(spec, slots, base_seed)
+
     for track in sorted(spec.tracks, key=lambda t: CHANNEL[t.role.value]):
         role = track.role.value
         rng = Rng(base_seed, role)
         # engine "v2" (docs/compiler-v2.md): melody is v2 (PR2); the other roles still delegate to the v1 builders.
         if track.role is Role.melody:
-            notes = _melody_track_v2(spec, track, base_seed) if spec.engine == "v2" else None
+            notes = _melody_track_v2(spec, track, base_seed, slots) if spec.engine == "v2" else None
             if notes is None:  # v1, or a v2 motif that does not fit the register
                 notes = _melody_track(spec, track, rng)
         elif track.role is Role.bass:
-            notes = _bass_track(spec, track, rng)
+            notes = _bass_track(spec, track, rng, slots)
         elif track.role is Role.chords:
-            notes = _chords_track(spec, track, rng, pad=False)
+            notes = _chords_track(spec, track, rng, pad=False, slots=slots)
         elif track.role is Role.pad:
-            notes = _chords_track(spec, track, rng, pad=True)
+            notes = _chords_track(spec, track, rng, pad=True, slots=slots)
         else:
             notes = _drum_track(spec, track, rng)
         channel = CHANNEL[role]

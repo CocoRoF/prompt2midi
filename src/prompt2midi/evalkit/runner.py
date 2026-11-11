@@ -26,6 +26,11 @@ FAKE_SPEC = {
 }
 
 
+def labels_of(item) -> list[str]:
+    """Names of the expect fields that are set (in the order of the Expect model)."""
+    return [k for k in type(item.expect).model_fields if getattr(item.expect, k) is not None] if item.expect is not None else []
+
+
 def make_provider(name: str):
     if name == "rule":
         return RuleProvider()
@@ -40,6 +45,8 @@ class ItemResult:
     lang: str
     tier: str
     generated: bool
+    provider: str
+    labels: list[str]
     error: str
     provider_used: str
     attempts: int
@@ -49,7 +56,7 @@ class ItemResult:
     results: dict[str, Result] = field(default_factory=dict)
 
 
-def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_retries: int = 2, check_determinism: bool = True) -> list[ItemResult]:
+def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_retries: int = 2, check_determinism: bool = True, tempo_tol: float | None = None) -> list[ItemResult]:
     """fallback=False by default so the numbers describe the chosen provider alone."""
     out = []
     for item in eval_set.prompts:
@@ -70,9 +77,9 @@ def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_ret
                 det = again.midi == midi
             except (GenerationError, ValueError):
                 det = False
-        ctx = Context(item.expect, spec, midi, err, det)
+        ctx = Context(item.expect, spec, midi, err, det, tempo_tol)
         out.append(ItemResult(
-            item.id, item.lang, item.tier, midi is not None, err, used if midi is not None else "", attempts, fb,
+            item.id, item.lang, item.tier, midi is not None, provider, labels_of(item), err, used if midi is not None else "", attempts, fb,
             total_bars(spec) if spec is not None else None, hashlib.sha256(midi).hexdigest()[:8] if midi else "",
             {m.name: m.fn(ctx) for m in METRICS},
         ))

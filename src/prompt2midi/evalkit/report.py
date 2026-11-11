@@ -4,18 +4,31 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .metrics import FAIL, LISTEN_COLUMNS, METRICS, NA, PASS
+from .metrics import AXIS1_METRICS, AXIS23_METRICS, FAIL, LISTEN_COLUMNS, METRICS, NA, PASS, TEMPO_TOLERANCE_BPM, VALUE_METRICS
 from .runner import ItemResult
+from .version import EVALKIT_VERSION
 
 LISTEN_TEXT = "청취 필요"
 HEAD = ["id", "lang", "tier", "generated", "error", "provider_used", "attempts", "retries", "fallback_used", "bars", "midi_sha8"]
+
+
+# Columns added after v0.1 are appended AFTER the original ones: existing names and their order never change.
+EXTRA_HEAD = ["provider", "labels"]
+ALIASES = {"곡ID": "id", "언어": "lang"}  # 연구 1팀 proposal names, appended last
 
 
 def columns() -> list[str]:
     cols = list(HEAD)
     for m in METRICS:
         cols += [m.name, m.name + "_reason"]
-    return cols + list(LISTEN_COLUMNS)
+    cols += list(LISTEN_COLUMNS) + EXTRA_HEAD
+    cols += [name + "_value" for name in VALUE_METRICS] + ["axis1_ok"]
+    return cols + list(ALIASES)
+
+
+def axis1_ok(r: ItemResult) -> bool:
+    """Generated, and every axis 1 metric is pass or na (na = not applicable, e.g. bars_min for a prompt that states its bars)."""
+    return r.generated and all(r.results[n].status in (PASS, NA) for n in AXIS1_METRICS)
 
 
 def rows(results: list[ItemResult]) -> list[dict]:
@@ -29,6 +42,13 @@ def rows(results: list[ItemResult]) -> list[dict]:
             row[m.name], row[m.name + "_reason"] = res.status, res.reason
         for c in LISTEN_COLUMNS:
             row[c] = LISTEN_TEXT
+        row["provider"], row["labels"] = r.provider, ";".join(r.labels)
+        for name in VALUE_METRICS:
+            v = r.results[name].value
+            row[name + "_value"] = "" if v is None else v
+        row["axis1_ok"] = axis1_ok(r)
+        for alias, src in ALIASES.items():
+            row[alias] = row[src]
         out.append(row)
     return out
 
@@ -49,7 +69,7 @@ def _cell(group: list[ItemResult], name: str) -> str:
     return f"{p}/{d} ({100 * p / d:.0f}%)" + (f" · na {n}" if n else "")
 
 
-def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provider: str, fallback: bool) -> str:
+def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provider: str, fallback: bool, tempo_tol: float | None = None) -> str:
     tiers = sorted({r.tier for r in results})
     langs = [l for l in ("ko", "en") if any(r.lang == l for r in results)]
     groups: list[tuple[str, list[ItemResult]]] = []
@@ -65,17 +85,30 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
     groups.append(("전체", list(results)))
     n = len(results)
     gen = sum(r.generated for r in results)
+    tempo_text = f"±{TEMPO_TOLERANCE_BPM} BPM (기본)" if tempo_tol is None else f"±{tempo_tol:.1%} (상대, `--tempo-tol {tempo_tol}`)"
+    ok1 = [r for r in results if axis1_ok(r)]
+    with_key = sum(1 for r in results if "tonic" in r.labels and "mode" in r.labels)
     lines = [
         f"# evalkit 요약 — {set_name}", "",
-        f"- 세트: `{set_name}` ({n}개, 파일 sha256 앞 8자 `{set_sha[:8]}`) · 공급자: `{provider}` · 폴백: {'켬' if fallback else '끔(공급자만 측정)'}",
-        f"- 생성 성공 {gen}/{n}. 시각·시간 값은 넣지 않는다(같은 코드·같은 세트면 같은 파일).",
+        f"- `evalkit_version` {EVALKIT_VERSION} · 세트: `{set_name}` ({n}개, 파일 sha256 앞 8자 `{set_sha[:8]}`) · 공급자: `{provider}` · 폴백: {'켬' if fallback else '끔(공급자만 측정)'}",
+        f"- 허용오차: 템포 {tempo_text} · 마디 수 정확 일치 · 음계 이탈 ≤10% · 악기 음역 밖 ≤5% · 길이 ≥8마디",
+        f"- 유효 곡 비율: 생성 성공 {gen}/{n} · 축 1 통과(`axis1_ok`) {len(ok1)}/{n}. 시각·시간 값은 넣지 않는다(같은 코드·같은 세트면 같은 파일).",
         "", "## 지표별 통과 비율", "",
-        "셀 = `통과/분모 (비율)`. **분모는 pass+fail 만**이고, 라벨이 없거나 해당 없는 항목(`na`)은 분모에서 뺀 뒤 `· na N` 으로 따로 적는다. 분모가 0이면 `—`.", "",
+        "셀 = `통과/분모 (비율)`. **분모는 pass+fail 만**이고, 라벨이 없거나 해당 없는 항목(`na`)은 분모에서 뺀 뒤 `· na N` 으로 따로 적는다. 분모가 0이면 `—`.",
+        f"음계 이탈(2-3)은 tonic·mode 라벨이 **둘 다 있는 항목만** 채점한다: 이 세트에서 {with_key}/{n}개.", "",
         "| 지표 | " + " | ".join(g for g, _ in groups) + " |", "|---|" + "---|" * len(groups),
         f"| 프롬프트 수 | " + " | ".join(str(len(g)) for _, g in groups) + " |",
     ]
     for m in METRICS:
         lines.append(f"| {m.title} (`{m.name}`) | " + " | ".join(_cell(g, m.name) for _, g in groups) + " |")
+    ok_groups = [(g, [r for r in rs if axis1_ok(r)]) for g, rs in groups]
+    lines += ["", "## 축 1 통과 곡만의 집계 (축 2·3 지표)", "",
+              "연구 1팀 규칙: 축 1(MIDI 유효성) 실패 곡은 이후 축 2·3 집계에서 뺀다. 축 1 = " + ", ".join(f"`{m}`" for m in AXIS1_METRICS) + " (모두 pass 또는 na). 악기 지표는 축 3 이라 축 1 에 넣지 않는다. 분모 규칙은 위와 같다.", "",
+              "| 지표 | " + " | ".join(g for g, _ in ok_groups) + " |", "|---|" + "---|" * len(ok_groups),
+              "| 축 1 통과 곡 수 / 전체 | " + " | ".join(f"{len(rs)}/{len(all_g)}" for (_, rs), (_, all_g) in zip(ok_groups, groups)) + " |"]
+    titles = {m.name: m.title for m in METRICS}
+    for name in AXIS23_METRICS:
+        lines.append(f"| {titles[name]} (`{name}`) | " + " | ".join(_cell(rs, name) for _, rs in ok_groups) + " |")
     lines += ["", "## 재시도·폴백 (참고, 합격 판정 아님)", "",
               "| 그룹 | 재시도가 있었던 프롬프트 | 폴백으로 만든 프롬프트 | 생성 실패 |", "|---|---|---|---|"]
     for gname, g in groups:

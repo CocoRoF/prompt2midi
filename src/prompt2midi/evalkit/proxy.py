@@ -90,6 +90,7 @@ class ProxyResult:
     status: str
     reason: str = ""
     values: dict[str, float | None] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)  # per-pair / per-slot records (M5, M6); written to proxy_details.jsonl, not to the CSV
 
 
 def _r(x: float) -> float:
@@ -441,7 +442,8 @@ def return_pairs(names: list[str]) -> list[tuple[int, int]]:
 def m5_section_contrast(m: Material) -> ProxyResult:
     """M5: do neighbouring sections differ in density / register / loudness, and does a returning section (A2) come back close to A.
 
-    The four d_* values reported are the LARGEST over neighbouring section pairs (정의서 질문 1: the 정의서 defines them per pair).
+    **Reporting rule (연구 1팀 허지민 제안): the CSV carries, for each d_* value, the LARGEST over the neighbouring section pairs; the
+    value of every pair (neighbouring and return pairs, with its kind and the four d_* values) is in `proxy_details.jsonl`.**
     Stands in for: arrangement contrast and the consistency of a reprise. Limits: says "different", not how or whether it sounds
     good; ignores drums; very short sections give unstable medians. TEMPORARY thresholds.
     """
@@ -463,6 +465,7 @@ def m5_section_contrast(m: Material) -> ProxyResult:
         return (0.0 if mx == 0 else abs(x["dens"] - y["dens"]) / mx, abs(x["med"] - y["med"]), abs(x["rng"] - y["rng"]), abs(x["vel"] - y["vel"]))
 
     adj = [diff(a, b) for a, b in zip(stats, stats[1:])]
+    names = [sec[0] for sec in m.sections]
     contrast = any(d[0] >= T["m5_contrast_dens"] or d[1] >= T["m5_contrast_reg"] or d[3] >= T["m5_contrast_vel"] for d in adj)
     rets = return_pairs([s[0] for s in m.sections])
     ret_close = None
@@ -472,7 +475,19 @@ def m5_section_contrast(m: Material) -> ProxyResult:
                                   "d_vel": _r(max(d[3] for d in adj)), "contrast_present": 1.0 if contrast else 0.0,
                                   "return_close": None if ret_close is None else (1.0 if ret_close else 0.0)}
     bad = [n for n, ok in (("contrast_present", contrast), ("return_close", ret_close is None or ret_close)) if not ok]
-    return ProxyResult(OUT_OF_RANGE if bad else IN_RANGE, ("범위 밖: " + ", ".join(bad)) if bad else "모두 범위 안", v)
+
+    def pair(kind, a, b, d):
+        rec = {"kind": kind, "a": names[a], "b": names[b], "d_dens": _r(d[0]), "d_reg": _r(d[1]), "d_range": _r(d[2]), "d_vel": _r(d[3])}
+        if kind == "adjacent":   # the contrast test of this pair
+            rec["contrast"] = d[0] >= T["m5_contrast_dens"] or d[1] >= T["m5_contrast_reg"] or d[3] >= T["m5_contrast_vel"]
+        else:                    # the return test of this pair
+            rec["close"] = d[0] <= T["m5_return_dens"] and d[1] <= T["m5_return_reg"]
+        return rec
+
+    details = {"sections": [{"name": sec[0], "start_bar": sec[1], "end_bar": sec[2], "density": _r(st["dens"]), "median_pitch": st["med"], "range_p90_p10": st["rng"], "mean_velocity": _r(st["vel"])}
+                            for sec, st in zip(m.sections, stats)],
+               "pairs": [pair("adjacent", i, i + 1, d) for i, d in enumerate(adj)] + [pair("return", a, b, diff(stats[a], stats[b])) for a, b in rets]}
+    return ProxyResult(OUT_OF_RANGE if bad else IN_RANGE, ("범위 밖: " + ", ".join(bad)) if bad else "모두 범위 안", v, details)
 
 
 # ------------------------------------------------------------------------------------------------------------ M6
@@ -513,6 +528,8 @@ def m6_chord_movement(m: Material) -> ProxyResult:
     Stands in for: smoothness of the harmonic progression (voice leading). Limits: small movement is not good harmony (a static
     chord is smooth and boring, hence no change = out of range); no function (why I-V-vi-IV is common); style dependent; a chord
     track that re-strikes root position raises `voicing_move` without being bad. Chord names come from the spec only. TEMPORARY thresholds.
+    The CSV carries the MEANS over all chord changes; every slot-to-slot move (chord names, pitch-class move, whether the chord changed,
+    the realised voicing move) is in `proxy_details.jsonl`.
     정의서 질문 7: `chord_change_rate` compares chord NAMES (not pitch-class sets). 질문 8: the chord list is the compiler's slot order over all sections (chords cycled per section, chords_per_bar slots per bar), pairs across a section border included. 질문 9: the voicing at a slot is the set of chord-track notes sounding at the slot's start tick; the chord track is the spec's `chords` role (channel 2), else `pad` (channel 3).
     """
     T = THRESH
@@ -526,17 +543,21 @@ def m6_chord_movement(m: Material) -> ProxyResult:
     moves = [_move(list(a), list(b), _circ) for a, b in zip(sets, sets[1:])]
     changed = sum(a != b for a, b in zip(m.chords, m.chords[1:]))
     v: dict[str, float | None] = {"chord_move_pc": _r(sum(moves) / len(moves)), "chord_change_rate": _r(changed / len(moves)), "voicing_move": None}
+    per_voicing: list[float | None] = [None] * len(moves)
     if m.chord_track_notes:
         sounding = [sorted(n.pitch for n in m.chord_track_notes if n.start <= t < n.end) for t in m.chord_starts]
-        dists = [_move(a, b, lambda p, q: abs(p - q)) for a, b in zip(sounding, sounding[1:]) if a and b]
+        per_voicing = [_move(a, b, lambda p, q: abs(p - q)) if a and b else None for a, b in zip(sounding, sounding[1:])]
+        dists = [d for d in per_voicing if d is not None]
         v["voicing_move"] = _r(sum(dists) / len(dists)) if dists else None
+    details = {"moves": [{"slot": i, "from": m.chords[i], "to": m.chords[i + 1], "start_tick": m.chord_starts[i], "move_pc": _r(mv), "changed": m.chords[i] != m.chords[i + 1],
+                          "voicing_move": None if pv is None else _r(pv)} for i, (mv, pv) in enumerate(zip(moves, per_voicing))]}
     lo, hi = T["m6_move_range"]
     bad = []
     if v["chord_change_rate"] == 0.0 or not lo <= v["chord_move_pc"] <= hi:
         bad.append("chord_move_pc" if v["chord_change_rate"] else "chord_change_rate")
     if v["voicing_move"] is not None and v["voicing_move"] > T["m6_voicing_max"]:
         bad.append("voicing_move")
-    return ProxyResult(OUT_OF_RANGE if bad else IN_RANGE, ("범위 밖: " + ", ".join(bad)) if bad else "모두 범위 안", v)
+    return ProxyResult(OUT_OF_RANGE if bad else IN_RANGE, ("범위 밖: " + ", ".join(bad)) if bad else "모두 범위 안", v, details)
 
 
 # ------------------------------------------------------------------------------------------------------------ M7

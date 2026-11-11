@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .model import SetError, load_set
-from .report import summary_md, write_csv
+from .report import DETAILS_FILE, summary_md, write_csv, write_details
 from .runner import PROVIDERS, run_set
 
 
@@ -37,10 +37,11 @@ def main(argv=None) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     write_csv(results, out / "results.csv")
+    write_details(results, out / DETAILS_FILE)
     md = summary_md(results, set_name=eval_set.name, set_sha=sha, provider=args.provider, fallback=args.fallback, tempo_tol=args.tempo_tol)
     (out / "summary.md").write_text(md, encoding="utf-8")
     print(md)
-    print(f"쓴 파일: {out / 'results.csv'}, {out / 'summary.md'}")
+    print(f"쓴 파일: {out / 'results.csv'}, {out / 'summary.md'}, {out / DETAILS_FILE}")
     return 0
 
 

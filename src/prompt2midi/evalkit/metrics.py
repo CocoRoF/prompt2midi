@@ -19,7 +19,9 @@ DEFAULT_BARS = 12
 MIN_BARS = 8
 TEMPO_TOLERANCE_BPM = 0.5
 OUT_OF_RANGE_MAX = 0.05   # 연구 1팀 1-2: 악기 음역 밖 노트 5% 이하
-OFF_SCALE_MAX = 0.10      # 연구 1팀 2-3: 조 구성음 밖 노트 10% 이하 (재즈·블루스 25% 규칙은 장르 라벨이 없어 적용하지 않음)
+OFF_SCALE_MAX = 0.10      # 연구 1팀 2-3: 조 구성음 밖 노트 10% 이하
+OFF_SCALE_RELAXED_MAX = 0.25   # 연구 1팀 결정(허지민): 장르 라벨에 jazz 또는 blues 가 있으면 25% 이하
+RELAXED_GENRES = ("jazz", "blues")
 DRUM_CHANNEL = 9
 PROGRAM_TO_INSTRUMENT = {v: k for k, v in GM_PROGRAM.items()}
 LISTEN_COLUMNS = ("mood_listen", "musicality_listen")  # always "청취 필요": a human rubric scores these
@@ -227,7 +229,11 @@ def scale_deviation(ctx: Context) -> Result:
     if not pitches:
         return Result(NA, "음높이가 있는 음표가 없음")
     out = sum(1 for p in pitches if p % 12 not in scale)
-    return Result(PASS if out / len(pitches) <= OFF_SCALE_MAX else FAIL, f"음계 밖 {_frac(out, len(pitches))}, 허용 ≤{OFF_SCALE_MAX:.0%}", round(out / len(pitches), 4))
+    genres = {g.value for g in (_label(ctx, "genre") or [])}
+    relaxed = bool(genres & set(RELAXED_GENRES))
+    limit = OFF_SCALE_RELAXED_MAX if relaxed else OFF_SCALE_MAX
+    note = " (재즈·블루스 완화 25%)" if relaxed else ""
+    return Result(PASS if out / len(pitches) <= limit + 1e-9 else FAIL, f"음계 밖 {_frac(out, len(pitches))}, 허용 ≤{limit:.0%}{note}", round(out / len(pitches), 4))
 
 
 def midicheck_valid(ctx: Context) -> Result:

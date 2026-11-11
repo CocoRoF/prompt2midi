@@ -91,7 +91,7 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
     lines = [
         f"# evalkit 요약 — {set_name}", "",
         f"- `evalkit_version` {EVALKIT_VERSION} · 세트: `{set_name}` ({n}개, 파일 sha256 앞 8자 `{set_sha[:8]}`) · 공급자: `{provider}` · 폴백: {'켬' if fallback else '끔(공급자만 측정)'}",
-        f"- 허용오차: 템포 {tempo_text} · 마디 수 정확 일치 · 음계 이탈 ≤10% · 악기 음역 밖 ≤5% · 길이 ≥8마디",
+        f"- 허용오차: 템포 {tempo_text} · 마디 수 정확 일치 · 음계 이탈 ≤10% (genre 라벨에 jazz·blues 가 있으면 ≤25%) · 악기 음역 밖 ≤5% · 길이 ≥8마디",
         f"- 유효 곡 비율: 생성 성공 {gen}/{n} · 축 1 통과(`axis1_ok`) {len(ok1)}/{n}. 시각·시간 값은 넣지 않는다(같은 코드·같은 세트면 같은 파일).",
         "", "## 곡(MIDI) 지표별 통과 비율", "",
         "셀 = `통과/분모 (비율)`. **분모는 pass+fail 만**이고, 라벨이 없거나 해당 없는 항목(`na`)은 분모에서 뺀 뒤 `· na N` 으로 따로 적는다. 분모가 0이면 `—`.",

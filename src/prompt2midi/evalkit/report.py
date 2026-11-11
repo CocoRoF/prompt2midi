@@ -56,6 +56,10 @@ def rows(results: list[ItemResult]) -> list[dict]:
             for n in names:
                 v = res.values.get(n) if res else None
                 row[f"{P.COLUMN_PREFIX}{key}_{n}"] = "" if v is None else v
+        for key, n in P.EXTRA_VALUES:  # v0.7: appended after all v0.6 proxy columns
+            res = r.proxy.get(key)
+            v = res.values.get(n) if res else None
+            row[f"{P.COLUMN_PREFIX}{key}_{n}"] = "" if v is None else v
         row["axis1_ok"] = axis1_ok(r)
         for alias, src in ALIASES.items():
             row[alias] = row[src]
@@ -161,7 +165,7 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
         lines.append(f"| {title} (`{P.COLUMN_PREFIX}{key}`) | {i_} | {o_} | {n_} | " + (f"{i_}/{i_ + o_} ({100 * i_ / (i_ + o_):.0f}%)" if i_ + o_ else "—") + " |")
     lines += ["", "값의 분포(측정된 곡만, 합격 기준 아님):", "", "| 값 | 측정된 곡 수 | 최솟값 | 중앙값 | 최댓값 |", "|---|---|---|---|---|"]
     for key, _title, _fn, names in P.PROXIES:
-        for nm in names:
+        for nm in (*names, *(n for k2, n in P.EXTRA_VALUES if k2 == key and n != "voicing_track")):
             vals = sorted(float(r.proxy[key].values[nm]) for r in results if key in r.proxy and r.proxy[key].values.get(nm) is not None)
             stats = f"{vals[0]:.4f} | {median(vals):.4f} | {vals[-1]:.4f}" if vals else "— | — | —"
             lines.append(f"| `{P.COLUMN_PREFIX}{key}_{nm}` | {len(vals)}/{n} | {stats} |")

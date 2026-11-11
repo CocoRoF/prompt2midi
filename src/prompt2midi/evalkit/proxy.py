@@ -116,6 +116,7 @@ class Material:
     chords: list[str] | None     # chord names in slot order, spec only
     chord_starts: list[int] | None   # tick where each chord slot starts (compiler layout), spec only
     chord_track_notes: list[Note] | None
+    chord_track_role: str | None     # "chords" or "pad" (the fallback), None when the spec has neither
     last_bar: int | None
 
 
@@ -184,7 +185,7 @@ def build_material(midi: bytes, spec: MusicSpec | None, expect=None) -> Material
         tonic_pc, mode = PITCH_CLASS[spec.key.tonic.value], spec.key.mode.value
     elif expect is not None and expect.tonic is not None and expect.mode is not None:
         tonic_pc, mode = PITCH_CLASS[expect.tonic.value], expect.mode.value
-    sections = chords = starts = chord_notes = None
+    sections = chords = starts = chord_notes = chord_role = None
     if spec is not None and bt is not None:
         sections, pos = [], 0
         chords, starts = [], []
@@ -197,9 +198,10 @@ def build_material(midi: bytes, spec: MusicSpec | None, expect=None) -> Material
             pos += s.bars
         roles = {t.role.value for t in spec.tracks}
         ch = 2 if "chords" in roles else 3 if "pad" in roles else None
+        chord_role = "chords" if "chords" in roles else "pad" if "pad" in roles else None
         chord_notes = [n for n in notes if n.channel == ch] if ch is not None else None
     last_bar = ((max(n.end for n in notes) - 1) // bt) if notes and bt else None
-    return Material(notes, tpq, bt, mel, bass[-1].pitch % 12 if bass else None, tonic_pc, mode, sections, chords, starts, chord_notes, last_bar)
+    return Material(notes, tpq, bt, mel, bass[-1].pitch % 12 if bass else None, tonic_pc, mode, sections, chords, starts, chord_notes, chord_role, last_bar)
 
 
 # ------------------------------------------------------------------------------------------------------------ M1
@@ -380,7 +382,7 @@ def m4_final_note(m: Material) -> ProxyResult:
     Stands in for: cadential closure. Limits: only one necessary condition of a cadence (no V-I, no metric feel); a deliberate
     open ending is out of range; the key is the DECLARED one (never estimated), so our own output scores high by construction.
     TEMPORARY thresholds.
-    정의서 질문 5: "the last melody note before the section end" = the last melody note that starts before the section's end bar; sections with no earlier melody note are skipped.
+    정의서 질문 5 (answered): "the last melody note before the section end" = the last melody note INSIDE the section (start bar <= onset < end bar border); a section with no melody note is skipped and never borrows a note from an earlier section.
     정의서 질문 6: the key is the spec's; if there is no spec, the evaluation set's tonic+mode label is used (정의서 6절 says external MIDI needs a label).
     """
     T = THRESH
@@ -404,8 +406,8 @@ def m4_final_note(m: Material) -> ProxyResult:
     }
     if m.sections and len(m.sections) >= 2:
         stable = total = 0
-        for _name, _b0, b1 in m.sections[:-1]:
-            before = [n for n in m.mel if n.start < b1 * m.bt]
+        for _name, b0, b1 in m.sections[:-1]:
+            before = [n for n in m.mel if b0 * m.bt <= n.start < b1 * m.bt]   # inside the section itself; a section without melody notes is skipped
             if before:
                 total += 1
                 stable += before[-1].pitch % 12 in triad
@@ -421,6 +423,7 @@ def m4_final_note(m: Material) -> ProxyResult:
 # ------------------------------------------------------------------------------------------------------------ M5
 
 M5_VALUES = ("d_dens", "d_reg", "d_range", "d_vel", "contrast_present", "return_close")
+M5_RET_VALUES = ("ret_d_dens", "ret_d_reg", "ret_d_range", "ret_d_vel")   # v0.7: the same four values over the RETURN pairs (CSV: appended last)
 
 
 def _nearest_rank(sorted_vals: list[int], q: float) -> int:
@@ -428,22 +431,18 @@ def _nearest_rank(sorted_vals: list[int], q: float) -> int:
 
 
 def return_pairs(names: list[str]) -> list[tuple[int, int]]:
-    """Section index pairs (earlier, later) where the later name is an earlier section's name plus digits (A -> A2).
-    ASSUMPTION (정의서 질문 2): the 정의서 says the spec marks repeats; our MusicSpec has no such field, so the A/A2 naming of
-    the expander is used."""
-    out = []
-    for j, nm in enumerate(names):
-        stem = nm.rstrip("0123456789")
-        if stem != nm and stem in names[:j]:
-            out.append((names.index(stem), j))
-    return out
+    """Return pairs (CONFIRMED rule, 연구 1팀 선지우): every index pair i < j whose names satisfy name_j == name_i or
+    name_j == name_i + "2". Ascending (i, j). Examples: A,B,A,B2 -> (0,2),(1,3); A,B,A -> (0,2); A,A2,A22 -> (0,1),(1,2);
+    A,A,A -> (0,1),(0,2),(1,2) (duplicate names pair up with every earlier equal name)."""
+    return [(i, j) for i in range(len(names)) for j in range(i + 1, len(names)) if names[j] == names[i] or names[j] == names[i] + "2"]
 
 
 def m5_section_contrast(m: Material) -> ProxyResult:
     """M5: do neighbouring sections differ in density / register / loudness, and does a returning section (A2) come back close to A.
 
-    **Reporting rule (연구 1팀 허지민 제안): the CSV carries, for each d_* value, the LARGEST over the neighbouring section pairs; the
-    value of every pair (neighbouring and return pairs, with its kind and the four d_* values) is in `proxy_details.jsonl`.**
+    **Reporting rule (연구 1팀 허지민 제안): the CSV carries, for each d_* value, the LARGEST over the neighbouring section pairs, and in
+    the separate columns ret_d_* the LARGEST over the return pairs (`return_close` is judged on each return pair's own values); the value of
+    every pair (neighbouring and return pairs, with its kind and the four d_* values) is in `proxy_details.jsonl`.**
     Stands in for: arrangement contrast and the consistency of a reprise. Limits: says "different", not how or whether it sounds
     good; ignores drums; very short sections give unstable medians. TEMPORARY thresholds.
     """
@@ -474,6 +473,9 @@ def m5_section_contrast(m: Material) -> ProxyResult:
     v: dict[str, float | None] = {"d_dens": _r(max(d[0] for d in adj)), "d_reg": _r(max(d[1] for d in adj)), "d_range": _r(max(d[2] for d in adj)),
                                   "d_vel": _r(max(d[3] for d in adj)), "contrast_present": 1.0 if contrast else 0.0,
                                   "return_close": None if ret_close is None else (1.0 if ret_close else 0.0)}
+    ret_d = [diff(stats[a], stats[b]) for a, b in rets]   # the return pairs' own values (never mixed into the neighbouring-pair maximum above)
+    for k, name in enumerate(M5_RET_VALUES):
+        v[name] = _r(max(d[k] for d in ret_d)) if ret_d else None
     bad = [n for n, ok in (("contrast_present", contrast), ("return_close", ret_close is None or ret_close)) if not ok]
 
     def pair(kind, a, b, d):
@@ -493,6 +495,7 @@ def m5_section_contrast(m: Material) -> ProxyResult:
 # ------------------------------------------------------------------------------------------------------------ M6
 
 M6_VALUES = ("chord_move_pc", "chord_change_rate", "voicing_move")
+M6_EXTRA = ("voicing_track",)   # v0.7: which track the voicing was read from: "chords" or "pad" (CSV: appended last)
 
 
 def chord_pcs(name: str) -> tuple[int, ...] | None:
@@ -542,14 +545,15 @@ def m6_chord_movement(m: Material) -> ProxyResult:
         return _na("코드 음질이 표 밖", M6_VALUES)
     moves = [_move(list(a), list(b), _circ) for a, b in zip(sets, sets[1:])]
     changed = sum(a != b for a, b in zip(m.chords, m.chords[1:]))
-    v: dict[str, float | None] = {"chord_move_pc": _r(sum(moves) / len(moves)), "chord_change_rate": _r(changed / len(moves)), "voicing_move": None}
+    v: dict[str, float | None] = {"chord_move_pc": _r(sum(moves) / len(moves)), "chord_change_rate": _r(changed / len(moves)), "voicing_move": None, "voicing_track": None}
     per_voicing: list[float | None] = [None] * len(moves)
     if m.chord_track_notes:
         sounding = [sorted(n.pitch for n in m.chord_track_notes if n.start <= t < n.end) for t in m.chord_starts]
         per_voicing = [_move(a, b, lambda p, q: abs(p - q)) if a and b else None for a, b in zip(sounding, sounding[1:])]
         dists = [d for d in per_voicing if d is not None]
         v["voicing_move"] = _r(sum(dists) / len(dists)) if dists else None
-    details = {"moves": [{"slot": i, "from": m.chords[i], "to": m.chords[i + 1], "start_tick": m.chord_starts[i], "move_pc": _r(mv), "changed": m.chords[i] != m.chords[i + 1],
+        v["voicing_track"] = m.chord_track_role   # "pad" means the pad track stood in for a missing chords track
+    details = {"voicing_track": m.chord_track_role if m.chord_track_notes else None, "moves": [{"slot": i, "from": m.chords[i], "to": m.chords[i + 1], "start_tick": m.chord_starts[i], "move_pc": _r(mv), "changed": m.chords[i] != m.chords[i + 1],
                           "voicing_move": None if pv is None else _r(pv)} for i, (mv, pv) in enumerate(zip(moves, per_voicing))]}
     lo, hi = T["m6_move_range"]
     bad = []
@@ -557,7 +561,10 @@ def m6_chord_movement(m: Material) -> ProxyResult:
         bad.append("chord_move_pc" if v["chord_change_rate"] else "chord_change_rate")
     if v["voicing_move"] is not None and v["voicing_move"] > T["m6_voicing_max"]:
         bad.append("voicing_move")
-    return ProxyResult(OUT_OF_RANGE if bad else IN_RANGE, ("범위 밖: " + ", ".join(bad)) if bad else "모두 범위 안", v, details)
+    reason = ("범위 밖: " + ", ".join(bad)) if bad else "모두 범위 안"
+    if m.chord_track_notes:
+        reason += f" (보이싱 트랙: {m.chord_track_role}{' — chords 가 없어 pad 로 대체' if m.chord_track_role == 'pad' else ''})"
+    return ProxyResult(OUT_OF_RANGE if bad else IN_RANGE, reason, v, details)
 
 
 # ------------------------------------------------------------------------------------------------------------ M7
@@ -622,8 +629,12 @@ def evaluate(midi: bytes | None, spec: MusicSpec | None = None, expect=None, val
     return {k: fn(mat) for k, _t, fn, _n in PROXIES}
 
 
+# Columns added after v0.6 are appended AFTER all the v0.6 proxy columns (existing names and order never change).
+EXTRA_VALUES: tuple[tuple[str, str], ...] = tuple(("m5", n) for n in M5_RET_VALUES) + tuple(("m6", n) for n in M6_EXTRA)
+
+
 def column_names() -> list[str]:
     cols: list[str] = []
     for k, _t, _f, names in PROXIES:
         cols += [COLUMN_PREFIX + k, f"{COLUMN_PREFIX}{k}_reason"] + [f"{COLUMN_PREFIX}{k}_{n}" for n in names]
-    return cols
+    return cols + [f"{COLUMN_PREFIX}{k}_{n}" for k, n in EXTRA_VALUES]

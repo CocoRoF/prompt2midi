@@ -23,6 +23,7 @@ from ..spec import (
 from ..validate.theory import CHORD_TONES, check_theory
 from . import drums as D
 from .melody_v2 import build_melody
+from .voicing_v2 import next_voicing
 from .rng import Rng
 
 PPQ = 480
@@ -87,9 +88,14 @@ def _chords_track(spec: MusicSpec, track: Track, rng: Rng, pad: bool) -> list[_N
     beat = _ticks(Fraction(1))
     notes: list[_Note] = []
     center = (lo + hi) / 2
+    voiced = None   # engine "v2": the previous voicing (minimal-movement voice leading, compiler/voicing_v2.py)
     for start, length, chord, _si, sec in _slots(spec):
-        pitches = _chord_pitches(chord, lo, hi, center)
-        center = sum(pitches) / len(pitches)
+        if spec.engine == "v2":
+            voiced = next_voicing(chord, lo, hi, voiced)
+            pitches = list(voiced)
+        else:
+            pitches = _chord_pitches(chord, lo, hi, center)
+            center = sum(pitches) / len(pitches)
         sustained = pad or sec.energy < 0.35
         if sustained:
             hits = [(start, length)]

@@ -71,8 +71,8 @@ def test_v1_and_none_unchanged_and_only_melody_differs(specs):
         v1, v2 = compile_spec(sp), compile_spec(_v2(sp))
         a, b = _notes(v1), _notes(v2)
         for ch in set(a) | set(b):
-            if ch != 0:
-                assert a.get(ch) == b.get(ch), f"channel {ch} must not change in PR2"
+            if ch not in (0, 2, 3):   # melody (PR2/3) and chord/pad voicing (PR4) are the only roles v2 touches so far
+                assert a.get(ch) == b.get(ch), f"channel {ch} must not change in PR2-4"
         differ += a.get(0) != b.get(0)
     assert differ >= len(specs) - 2, "v2 should change the melody of (almost) every spec"
 

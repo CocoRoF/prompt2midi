@@ -52,8 +52,9 @@ if [ -n "$cfg_user" ] && [ "$cfg_user" != "root" ] && [ "$cfg_user" != "0" ]; th
 token="$(docker logs "$NAME" 2>&1 | grep -o '이 줄은 한 번만 출력됩니다): .*' | sed 's/^[^)]*): //' | head -n1)"
 if [ -n "$token" ]; then
   ok "설정 토큰이 서버 로그에 출력됨 (${#token}자)"
+  setup_pw="$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')"  # 실행마다 무작위(소스에 비밀번호 리터럴을 두지 않음)
   setup_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -X POST "${BASE}/api/admin/setup" \
-    -H 'Content-Type: application/json' -d "{\"setup_token\":\"${token}\",\"password\":\"ci-check-password-123\"}")"
+    -H 'Content-Type: application/json' -d "{\"setup_token\":\"${token}\",\"password\":\"${setup_pw}\"}")"
   if [ "$setup_code" = "200" ]; then ok "POST /api/admin/setup -> 200 (/data 쓰기 가능)"; else fail "POST /api/admin/setup -> ${setup_code}"; fi
   perms="$(docker exec "$NAME" stat -c '%a' /data/admin.json 2>/dev/null || echo none)"
   if [ "$perms" = "600" ]; then ok "/data/admin.json 권한 600"; else fail "/data/admin.json 권한 ${perms} (기대 600)"; fi

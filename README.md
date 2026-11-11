@@ -43,7 +43,7 @@ print(r.provider_used, r.seed, [w.message for w in r.warnings])
 - 평가: `python -m prompt2midi.evaluation data/eval_prompts_research1.json --out data/eval_rule_results.csv --md docs/rule-provider-eval.md`
 
 ## CI
-`.github/workflows/ci.yml`: push·PR 마다 Python 3.11~3.14 에서 `pytest`(LLM 실제 호출 없음, `P2M_LIVE` 미설정), 비밀 문자열 스캔(`tools/scan_secrets.py`), 의존성 라이선스 기록 검사(`tools/check_licenses.py`: `pyproject.toml` 의 의존성이 `data/sources.csv` 에 모두 있어야 함)를 돌린다.
+`.github/workflows/ci.yml`: push·PR 마다 Python 3.11~3.14 에서 `pytest`(LLM 실제 호출 없음, `P2M_LIVE` 미설정), 비밀 문자열 스캔(`tools/scan_secrets.py`), 의존성 라이선스 기록 검사(`tools/check_licenses.py`: `pyproject.toml`·`tools/requirements-ci.txt` 의 의존성이 `data/sources.csv` 에 모두 있어야 함), Docker 이미지 빌드·점검(`tools/docker_check.sh`), 헤드리스 브라우저 점검(`tools/browser_check.py`, `docs/manual-check.md` 의 자동 대체표 참고)을 돌린다. job 별 결과 스냅샷: `docs/ci-status.md`.
 비밀 스캔 오탐(시험용 가짜 키 등)은 해당 줄 끝에 `# pragma: allowlist secret` 주석을 달아 제외한다.
 
 ## 서버 실행 (웹 API + 화면)

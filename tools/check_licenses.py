@@ -2,7 +2,7 @@
 """pyproject.toml 의 의존성이 data/sources.csv 에 모두 기록됐는지 검사한다. 빠진 게 있으면 종료 코드 1.
 
 사용: python tools/check_licenses.py
-대상: [project].dependencies 와 [project.optional-dependencies] 의 직접 의존성.
+대상: [project].dependencies, [project.optional-dependencies] 의 직접 의존성, 그리고 CI 전용 tools/requirements-ci.txt 의 직접 의존성.
 sources.csv 의 name 열은 "패키지 버전" 형식(예: "pydantic 2.13.5")이며 패키지 이름만 비교한다(대소문자·-/_ 무시).
 """
 import csv
@@ -30,6 +30,12 @@ def main() -> int:
     reqs = list(project.get("dependencies", []))
     for extra in project.get("optional-dependencies", {}).values():
         reqs += extra
+    ci_file = ROOT / "tools" / "requirements-ci.txt"
+    if ci_file.exists():
+        for line in ci_file.read_text(encoding="utf-8").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                reqs.append(line)
     wanted = {req_name(r) for r in reqs}
 
     recorded = set()

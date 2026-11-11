@@ -309,3 +309,120 @@ def test_new_metrics_in_the_five_item_set(tmp_path):
     assert st(r, "p4", "scale_deviation") == "na" and st(r, "p3", "scale_deviation") == "na"   # only one label / none
     assert st(r, "p1", "midi_instruments_included") == "pass" and st(r, "p2", "midi_instruments_included") == "fail"
     assert all(st(r, i, m) == "pass" for i in r for m in ("pitch_range", "note_integrity", "no_empty_tracks"))
+
+
+# ---------- 연구 1팀 검토 회신 반영: --tempo-tol, 새 열, 축 1 집계, 요약 머리 ----------
+
+from prompt2midi.evalkit.version import EVALKIT_VERSION
+
+V01_COLUMNS = (  # the columns of PR #21/#23, in order: they must stay the first columns of results.csv
+    ["id", "lang", "tier", "generated", "error", "provider_used", "attempts", "retries", "fallback_used", "bars", "midi_sha8"]
+    + [c for m in ["tempo_match", "key_match", "time_signature_match", "bars_match", "bars_min", "instruments_included", "midi_instruments_included",
+                   "scale_deviation", "pitch_range", "note_integrity", "no_empty_tracks", "midicheck_valid", "deterministic"] for c in (m, m + "_reason")]
+    + ["mood_listen", "musicality_listen"]
+)
+
+
+def _meta(bpm):
+    return [(0, mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(bpm))), (0, mido.MetaMessage("time_signature", numerator=4, denominator=4))]
+
+
+def _tempo_ctx(bpm, label, tol=None):
+    ctx = _ctx(_midi([_meta(bpm), _notes(0, 0, [60])]), {"tempo_bpm": label})
+    ctx.tempo_tol = tol
+    return ctx
+
+
+def test_same_midi_passes_or_fails_depending_on_tempo_tol():
+    assert M.tempo_match(_tempo_ctx(105, 100)).status == "fail"                    # default: +-0.5 BPM
+    r = M.tempo_match(_tempo_ctx(105, 100, tol=0.10))
+    assert r.status == "pass" and "±10%" in r.reason and r.value == 105.0
+    assert M.tempo_match(_tempo_ctx(111, 100, tol=0.10)).status == "fail"          # outside +-10% even with the option
+    assert M.tempo_match(_tempo_ctx(110, 100, tol=0.10)).status == "pass"          # the border is inside (<=)
+    assert M.tempo_match(_tempo_ctx(100.4, 100)).status == "pass"                  # default still tolerates 0.5 BPM
+    assert M.tempo_match(_tempo_ctx(105, 100, tol=0.10)) == M.tempo_match(_tempo_ctx(105, 100, tol=0.10))
+
+
+def test_tempo_tol_option_end_to_end_and_recorded_in_summary(tmp_path):
+    data = copy.deepcopy(SET5)
+    data["prompts"] = [{"id": "t1", "lang": "en", "tier": "A", "text": "x", "expect": {"tempo_bpm": 105}}]   # fake provider plays 100 BPM
+    s = write(tmp_path, data)
+    assert cli.main([str(s), "--provider", "fake", "--out", str(tmp_path / "d")]) == 0
+    assert cli.main([str(s), "--provider", "fake", "--tempo-tol", "0.1", "--out", str(tmp_path / "t")]) == 0
+    assert cli.main([str(s), "--provider", "fake", "--tempo-tol", "0.1", "--out", str(tmp_path / "t2")]) == 0
+    import csv
+    row = lambda d: list(csv.DictReader(open(tmp_path / d / "results.csv", encoding="utf-8")))[0]
+    assert row("d")["tempo_match"] == "fail" and row("t")["tempo_match"] == "pass"
+    assert row("d")["tempo_match_value"] == row("t")["tempo_match_value"] == "100.0"
+    md_d, md_t = (tmp_path / "d" / "summary.md").read_text(encoding="utf-8"), (tmp_path / "t" / "summary.md").read_text(encoding="utf-8")
+    assert "템포 ±0.5 BPM (기본)" in md_d and "템포 ±10.0% (상대, `--tempo-tol 0.1`)" in md_t
+    for f in ("results.csv", "summary.md"):   # determinism holds with the option, too
+        assert (tmp_path / "t" / f).read_bytes() == (tmp_path / "t2" / f).read_bytes()
+
+
+@pytest.mark.parametrize("bad", ["0", "-0.1", "1.5", "abc"])
+def test_tempo_tol_rejects_nonsense(tmp_path, bad):
+    with pytest.raises(SystemExit) as e:
+        cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--tempo-tol", bad, "--out", str(tmp_path / "o")])
+    assert e.value.code == 2 and not (tmp_path / "o").exists()
+
+
+def test_csv_keeps_the_old_columns_first_and_appends_the_new_ones(tmp_path):
+    cols = report.columns()
+    assert cols[:len(V01_COLUMNS)] == V01_COLUMNS
+    assert cols[len(V01_COLUMNS):] == ["provider", "labels", "tempo_match_value", "scale_deviation_value", "pitch_range_value",
+                                       "bars_match_value", "bars_min_value", "axis1_ok", "곡ID", "언어"]
+    assert not any("시각" in c or "time" in c.lower().replace("time_signature", "") for c in cols)   # still no measurement time
+    out = tmp_path / "out"
+    cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--out", str(out)])
+    import csv
+    rows = {r["id"]: r for r in csv.DictReader(open(out / "results.csv", encoding="utf-8"))}
+    assert list(rows["p1"]) == cols
+    assert rows["p1"]["provider"] == "fake" and rows["p1"]["labels"] == "tonic;mode;tempo_bpm;time_signature;bars;instruments"
+    assert rows["p3"]["labels"] == "" and rows["p4"]["labels"] == "tonic"
+    assert rows["p1"]["tempo_match_value"] == "100.0" and rows["p3"]["tempo_match_value"] == ""          # na -> empty
+    assert rows["p1"]["bars_match_value"] == "12" and rows["p3"]["bars_min_value"] == "12" and rows["p1"]["bars_min_value"] == ""
+    assert float(rows["p2"]["scale_deviation_value"]) > 0.10 and rows["p1"]["scale_deviation_value"] == "0.0"
+    assert float(rows["p1"]["pitch_range_value"]) <= 0.05
+    assert all(r["곡ID"] == r["id"] and r["언어"] == r["lang"] for r in rows.values())
+    assert all(r["axis1_ok"] == "True" for r in rows.values())
+
+
+def test_axis1_failures_are_dropped_from_the_axis23_aggregate(tmp_path, monkeypatch):
+    spec = copy.deepcopy(runner.FAKE_SPEC)
+    spec["sections"] = [{"name": "A", "bars": 4, "chords": ["C", "G"], "energy": 0.5}]   # 4 bars: breaks the >=8 bar rule
+    monkeypatch.setattr(runner, "FAKE_SPEC", spec)
+    data = {"version": "1", "name": "axis1", "prompts": [
+        {"id": "a", "lang": "en", "tier": "A", "text": "no bar count", "expect": {"tempo_bpm": 100}},   # 4 bars, rule applies -> axis 1 fail
+        {"id": "b", "lang": "en", "tier": "A", "text": "four bars", "expect": {"tempo_bpm": 120, "bars": 4}},  # rule is na -> axis 1 ok, tempo fails
+    ]}
+    out = tmp_path / "out"
+    assert cli.main([str(write(tmp_path, data)), "--provider", "fake", "--out", str(out)]) == 0
+    import csv
+    rows = {r["id"]: r for r in csv.DictReader(open(out / "results.csv", encoding="utf-8"))}
+    assert rows["a"]["axis1_ok"] == "False" and rows["b"]["axis1_ok"] == "True"
+    md = (out / "summary.md").read_text(encoding="utf-8")
+    assert "축 1 통과(`axis1_ok`) 1/2" in md and "생성 성공 2/2" in md
+    main_t = next(l for l in md.splitlines() if l.startswith("| 템포 일치"))
+    axis_t = [l for l in md.splitlines() if l.startswith("| 템포 일치")][1]
+    assert main_t.endswith("| 1/2 (50%) |"), main_t        # all pieces: a passes, b fails
+    assert axis_t.endswith("| 0/1 (0%) |"), axis_t          # axis 1 survivors only: just b, which fails
+    assert "| 축 1 통과 곡 수 / 전체 |" in md and md.count("## 축 1 통과 곡만의 집계") == 1
+
+
+def test_axis1_is_false_when_generation_failed(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "make_provider", lambda name: FakeProvider([ProviderError("boom")], name="fake", repeat_last=True))
+    r = run5(tmp_path, check_determinism=False)
+    assert report.axis1_ok(r["p1"]) is False and report.rows(list(r.values()))[0]["axis1_ok"] is False
+
+
+def test_summary_header_and_label_count(tmp_path):
+    out = tmp_path / "out"
+    cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--out", str(out)])
+    md = (out / "summary.md").read_text(encoding="utf-8")
+    head = md.split("## 지표별")[0]
+    assert f"`evalkit_version` {EVALKIT_VERSION}" in head and "허용오차: 템포 ±0.5 BPM (기본) · 마디 수 정확 일치" in head
+    assert "유효 곡 비율: 생성 성공 5/5 · 축 1 통과(`axis1_ok`) 5/5" in head
+    assert "tonic·mode 라벨이 **둘 다 있는 항목만** 채점한다: 이 세트에서 2/5개" in md     # p1, p2 (p4 has only the tonic)
+    import re
+    assert not re.search(r"\d{4}-\d{2}-\d{2}|\d{2}:\d{2}", md)            # still no dates or times in the file

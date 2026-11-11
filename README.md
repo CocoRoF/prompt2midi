@@ -92,3 +92,12 @@ Docker: `docker stop prompt2midi && docker run --rm -v p2m-data:/data busybox rm
 - `/data` 를 백업하고 접근 권한을 제한한다(키가 들어 있다).
 - 환경변수와 구현 세부: [`docs/api-and-admin.md`](docs/api-and-admin.md) 9절.
 - 실제 LLM 평가(키 등록·비용 상한을 사람이 정한 뒤): `tools/live_eval.py`(기본 드라이런, 단계 5→20→전체, `--yes-spend --max-calls N` 과 `P2M_LIVE=1` 이 모두 있어야 호출). 사람이 할 일의 순서: [`docs/live-eval-checklist.md`](docs/live-eval-checklist.md).
+
+## 전후 비교 (engine v1 / v2) — `tools/compare_samples.py`
+같은 사양·같은 seed 로 `engine=v1` 과 `engine=v2` MIDI 를 쌍으로 만들고 evalkit 의 `proxy_*` 지표(M1~M7)를 나란히 놓는다. 키·네트워크·LLM·보류 세트·외부 데이터·text2midi 출력물 없음.
+```bash
+python tools/compare_samples.py                      # data/samples/baseline-v0/set.json 전체(16개) → out/compare-samples/
+python tools/compare_samples.py --set 세트.json --ids r01,r08 --out out/my-compare
+```
+- 출력: `<id>.v1.mid`·`<id>.v2.mid` 쌍, `compare.md`(판정 개수·곡별 판정·대표 값 v1→v2), `compare.csv`(모든 지표 값, v1·v2 열). 생성 커밋 해시·`evalkit_version`·옵션을 기록하고 시각·경로는 쓰지 않는다 — 같은 입력·같은 커밋이면 파일이 바이트 동일.
+- **표의 범위는 임시 기준이고 지표 변화는 음악 개선이 아니다. 청취는 하지 않았다(청취 미확인).** 결과 폴더 `out/` 는 커밋하지 않는다(`.gitignore`). 청취 평가용 블라인드 묶음은 `tools/listening_pack.py`.

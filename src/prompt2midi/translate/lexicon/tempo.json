@@ -1,0 +1,69 @@
+{
+  "_note": "words -> bpm. A sentence uses the group whose longest word is longest among the groups with a hit (so 'very slow' beats 'slow'). Korean Italian-term spellings and 천천히 are new in the Intent path.",
+  "words": [
+    {
+      "bpm": 55,
+      "words": [
+        "very slow",
+        "largo",
+        "아주 느린"
+      ]
+    },
+    {
+      "bpm": 66,
+      "words": [
+        "slow",
+        "adagio",
+        "느린",
+        "느리게",
+        "아다지오",
+        "천천히"
+      ]
+    },
+    {
+      "bpm": 85,
+      "words": [
+        "laid-back",
+        "laid back",
+        "relaxed pace"
+      ]
+    },
+    {
+      "bpm": 96,
+      "words": [
+        "moderate",
+        "andante",
+        "moderato",
+        "보통",
+        "모데라토",
+        "안단테"
+      ]
+    },
+    {
+      "bpm": 120,
+      "words": [
+        "lively",
+        "allegro",
+        "brisk",
+        "알레그로"
+      ]
+    },
+    {
+      "bpm": 140,
+      "words": [
+        "fast",
+        "quick",
+        "빠른",
+        "빠르게"
+      ]
+    },
+    {
+      "bpm": 170,
+      "words": [
+        "very fast",
+        "presto",
+        "아주 빠른"
+      ]
+    }
+  ]
+}

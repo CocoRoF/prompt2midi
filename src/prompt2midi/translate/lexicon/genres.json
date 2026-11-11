@@ -1,0 +1,93 @@
+{
+  "_note": "genre id -> words, listed in PRIORITY order (the expander uses the first genre for drums/progression): the order of the old drum-style table (bossa, electronic, jazz/blues, ballad/ambient, rock/pop). Words are the old drum-style words; no new words were added except the hiphop words below. Words without a genre in the agreed enum (slow, cinematic, shuffle) are not genres.",
+  "genres": [
+    {
+      "id": "bossa_nova",
+      "words": [
+        "bossa",
+        "samba",
+        "보사노바"
+      ]
+    },
+    {
+      "id": "electronic",
+      "words": [
+        "dance",
+        "electronic",
+        "edm",
+        "house",
+        "techno",
+        "disco",
+        "댄스",
+        "일렉트로닉"
+      ]
+    },
+    {
+      "id": "jazz",
+      "words": [
+        "jazz",
+        "swing",
+        "재즈",
+        "스윙"
+      ]
+    },
+    {
+      "id": "blues",
+      "words": [
+        "blues"
+      ]
+    },
+    {
+      "id": "ballad",
+      "words": [
+        "ballad",
+        "발라드"
+      ]
+    },
+    {
+      "id": "ambient",
+      "words": [
+        "ambient"
+      ]
+    },
+    {
+      "id": "lofi",
+      "words": [
+        "lo-fi",
+        "lofi"
+      ]
+    },
+    {
+      "id": "rock",
+      "words": [
+        "rock",
+        "punk",
+        "metal",
+        "록"
+      ]
+    },
+    {
+      "id": "pop",
+      "words": [
+        "pop",
+        "팝"
+      ]
+    },
+    {
+      "id": "classical",
+      "words": []
+    }
+  ],
+  "unsupported": [
+    {
+      "id": "hiphop",
+      "words": [
+        "hiphop",
+        "hip-hop",
+        "hip hop",
+        "힙합"
+      ],
+      "reason": "hiphop is not in the agreed genre enum: the wording is kept in raw.genre and genre stays empty"
+    }
+  ]
+}

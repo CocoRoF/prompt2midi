@@ -78,3 +78,39 @@ def assign_instruments(listed: list[str]) -> tuple[dict[str, str], bool, list[tu
             else:
                 ignored.append((ins, "no free role it is suited for"))
     return roles, drums, ignored
+
+
+# ---- legacy-compatible role assignment, used by instruments_mode="fill" (the RuleProvider) ----
+MELODY_LEGACY = tuple(i for i in MELODY_OK if i != "organ")  # the old rule never let an organ lead
+
+
+def assign_instruments_fill(listed: list[str]) -> tuple[dict[str, str], bool, list[tuple[str, str]]]:
+    """Named instruments -> roles in the way the old RuleProvider did (so its outputs stay the same):
+
+      melody = the first named instrument that can lead (an organ never leads),
+      chords = the first remaining named instrument suited for chords (an organ may; `strings` never: it is the pad),
+      pad    = strings if named (even if it also leads), else synth_pad if named,
+      bass   = the first named bass instrument, drums = 'drums' named.
+    Everything else named is ignored. Roles nobody names are filled by the expander's defaults.
+    """
+    roles: dict[str, str] = {}
+    used: set[str] = set()
+    drums = "drums" in listed
+    melody = next((i for i in listed if i in MELODY_LEGACY), None)
+    if melody:
+        roles["melody"], _ = melody, used.add(melody)
+    chords = next((i for i in listed if i in CHORDS_OK and i != "strings" and i not in used), None)
+    if chords:
+        roles["chords"], _ = chords, used.add(chords)
+    if "strings" in listed:
+        roles["pad"] = "strings"
+        used.add("strings")
+    elif "synth_pad" in listed:
+        roles["pad"] = "synth_pad"
+        used.add("synth_pad")
+    bass = next((i for i in listed if i in BASS_INSTRUMENTS), None)
+    if bass:
+        roles["bass"] = bass
+        used.add(bass)
+    ignored = [(i, "no free role it is suited for") for i in listed if i not in used and i != "drums"]
+    return roles, drums, ignored

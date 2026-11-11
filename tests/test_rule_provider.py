@@ -64,11 +64,11 @@ def test_key_forms(text, tonic, mode):
     assert (d["key"]["tonic"], d["key"]["mode"]) == (tonic, mode)
 
 
-@pytest.mark.parametrize("text,bpm", [("at 90 BPM", 90), ("at 40 bpm", 40), ("at 220 BPM", 220), ("at 300 BPM", None), ("at 20 BPM", None)])
+@pytest.mark.parametrize("text,bpm", [("at 90 BPM", 90), ("at 40 bpm", 40), ("at 200 BPM", 200), ("at 220 BPM", 200), ("at 300 BPM", None), ("at 20 BPM", None)])
 def test_bpm_bounds(text, bpm):
     d, _, _ = build("A piece " + text)
     if bpm is None:
-        assert 40 <= d["tempo_bpm"] <= 220  # out-of-range request is ignored, mood default used
+        assert 40 <= d["tempo_bpm"] <= 200  # out-of-range request is ignored, mood default used
     else:
         assert d["tempo_bpm"] == bpm
 

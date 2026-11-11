@@ -1,0 +1,104 @@
+{
+  "_note": "mood id -> trigger words (substring match on the lower-cased sentence). Moved unchanged from the old rule.py MOODS table; energy/mode/bpm/motif live in prompt2midi/presets.py. A sentence's mood is the id with the most hits (ties: file order).",
+  "moods": {
+    "calm": [
+      "calm",
+      "peace",
+      "serene",
+      "serenity",
+      "gentle",
+      "soft",
+      "잔잔",
+      "평화",
+      "고요"
+    ],
+    "relaxing": [
+      "relax",
+      "relaxing",
+      "laid-back",
+      "laid back",
+      "chill",
+      "lo-fi",
+      "lofi",
+      "편안",
+      "여유"
+    ],
+    "sad": [
+      "sad",
+      "melancholic",
+      "melancholy",
+      "sorrow",
+      "grief",
+      "lonely",
+      "슬픈",
+      "슬픔",
+      "우울"
+    ],
+    "dark": [
+      "dark",
+      "mysterious",
+      "tension",
+      "ominous",
+      "eerie",
+      "어두운",
+      "긴장",
+      "미스터리"
+    ],
+    "happy": [
+      "happy",
+      "cheerful",
+      "upbeat",
+      "joy",
+      "joyful",
+      "bright",
+      "행복",
+      "신나는",
+      "밝은"
+    ],
+    "playful": [
+      "playful",
+      "bouncy",
+      "fun",
+      "quirky",
+      "경쾌",
+      "장난"
+    ],
+    "energetic": [
+      "energetic",
+      "powerful",
+      "intense",
+      "driving",
+      "aggressive",
+      "에너지",
+      "강렬",
+      "격렬"
+    ],
+    "epic": [
+      "epic",
+      "heroic",
+      "triumphant",
+      "grand",
+      "cinematic",
+      "웅장",
+      "영웅"
+    ],
+    "romantic": [
+      "romantic",
+      "tender",
+      "love",
+      "warmth",
+      "warm",
+      "로맨틱",
+      "사랑",
+      "따뜻"
+    ],
+    "meditative": [
+      "meditative",
+      "meditation",
+      "ambient",
+      "zen",
+      "명상",
+      "앰비언트"
+    ]
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "_note": "Moved unchanged from the old rule.py tables. `instruments`: id -> words, in the order the old code tried them. `lead_capable`: ids that may lead (melody) in the old rule; extraction lists them first. `bass`: first group with a hit wins. `drums` and `pad` words add 'drums' / 'synth_pad'.",
+  "instruments": [
+    {
+      "id": "electric_piano",
+      "words": [
+        "electric piano",
+        "rhodes",
+        "일렉트릭 피아노"
+      ]
+    },
+    {
+      "id": "piano",
+      "words": [
+        "piano",
+        "피아노"
+      ]
+    },
+    {
+      "id": "flute",
+      "words": [
+        "flute",
+        "플루트",
+        "피리"
+      ]
+    },
+    {
+      "id": "violin",
+      "words": [
+        "violin",
+        "바이올린"
+      ]
+    },
+    {
+      "id": "trumpet",
+      "words": [
+        "trumpet",
+        "brass",
+        "트럼펫"
+      ]
+    },
+    {
+      "id": "strings",
+      "words": [
+        "string ensemble",
+        "strings",
+        "현악"
+      ]
+    },
+    {
+      "id": "sax",
+      "words": [
+        "saxophone",
+        "sax",
+        "색소폰"
+      ]
+    },
+    {
+      "id": "clarinet",
+      "words": [
+        "clarinet",
+        "클라리넷"
+      ]
+    },
+    {
+      "id": "marimba",
+      "words": [
+        "marimba",
+        "xylophone",
+        "마림바"
+      ]
+    },
+    {
+      "id": "synth_lead",
+      "words": [
+        "synth lead",
+        "lead synth",
+        "신스 리드"
+      ]
+    },
+    {
+      "id": "steel_guitar",
+      "words": [
+        "electric guitar",
+        "steel guitar",
+        "일렉기타",
+        "일렉트릭 기타"
+      ]
+    },
+    {
+      "id": "nylon_guitar",
+      "words": [
+        "acoustic guitar",
+        "nylon guitar",
+        "guitar",
+        "harp",
+        "기타",
+        "하프"
+      ]
+    },
+    {
+      "id": "organ",
+      "words": [
+        "organ",
+        "오르간"
+      ]
+    }
+  ],
+  "lead_capable": [
+    "piano",
+    "electric_piano",
+    "flute",
+    "violin",
+    "strings",
+    "trumpet",
+    "sax",
+    "clarinet",
+    "marimba",
+    "synth_lead",
+    "steel_guitar",
+    "nylon_guitar"
+  ],
+  "bass": [
+    {
+      "id": "upright_bass",
+      "words": [
+        "upright bass",
+        "double bass",
+        "contrabass",
+        "더블베이스"
+      ]
+    },
+    {
+      "id": "synth_bass",
+      "words": [
+        "synth bass",
+        "신스 베이스"
+      ]
+    },
+    {
+      "id": "electric_bass",
+      "words": [
+        "electric bass",
+        "bass guitar",
+        "bass",
+        "베이스"
+      ]
+    }
+  ],
+  "drums": [
+    "drum",
+    "drums",
+    "percussion",
+    "timpani",
+    "beat",
+    "드럼",
+    "타악"
+  ],
+  "pad": [
+    "pad",
+    "pads",
+    "패드"
+  ]
+}

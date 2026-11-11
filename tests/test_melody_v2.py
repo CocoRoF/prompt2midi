@@ -199,3 +199,134 @@ def test_chord_tones_and_snap():
     assert M._snap(62, frozenset({0, 4, 7}), 48, 84, 64) == 64   # tie (60/64): closer to previous
     assert M._snap(62, frozenset({0, 4, 7}), 48, 84, 60) == 60
     assert M._snap(66, frozenset({0, 4, 7}), 48, 84, None) in (67,)
+
+
+# ---------------------------------------------------------------- PR3: cadence, contour, breath -----------------------
+
+from prompt2midi.spec import TIME_SIGNATURES, parse_chord  # noqa: E402
+
+
+def _resized(sp, sig, bars_list):
+    d = sp.model_dump(mode="json", by_alias=True, exclude_none=True)
+    d["engine"] = "v2"
+    d["time_signature"] = list(sig)
+    base = d["sections"][0]
+    d["sections"] = [dict(base, name=f"s{i}", bars=b, energy=0.3 if i % 2 else 0.8) for i, b in enumerate(bars_list)]
+    return S.MusicSpec.model_validate(d)
+
+
+def _phrase_ends(sp):
+    """[(section index, phrase end tick)] for every phrase, from the same phrase split the compiler uses."""
+    bar = _ticks(beats_per_bar(sp))
+    out, pos = [], 0
+    for si, sec in enumerate(sp.sections):
+        for ln in M.phrase_lengths(sec.bars):
+            pos += ln * bar
+            out.append((si, pos))
+    return out
+
+
+def test_complete_cadence_in_last_section_and_half_cadence_before(specs):
+    checked = 0
+    for sp in specs:
+        sp = _v2(sp)
+        tr, got = _melody(sp)
+        if got is None or len(sp.sections) < 1:
+            continue
+        slots = list(_slots(sp))
+        bar = _ticks(beats_per_bar(sp))
+        total = sum(sec.bars for sec in sp.sections) * bar
+        pos = 0
+        for si, sec in enumerate(sp.sections):
+            end = pos + sec.bars * bar
+            last = [n for n in got if pos <= n.start < end][-1]
+            chord = next(c for s0, ln, c, _i, _s in slots if s0 <= last.start < s0 + ln)
+            info = M.chord_tones_info(chord)
+            if si == len(sp.sections) - 1:
+                assert last.pitch % 12 in {info.root, info.third}, (sp.title, chord, last.pitch)
+                assert last.end == total, "the final note is held to the very end of the last bar"
+            else:
+                assert last.pitch % 12 in info.tones
+                if info.fifth is not None:
+                    assert last.pitch % 12 == info.fifth or last.pitch % 12 == info.third
+            pos = end
+            checked += 1
+    assert checked >= len(specs)
+
+
+def test_every_phrase_ends_on_a_chord_tone_with_a_breath(specs):
+    for sp in specs:
+        sp = _v2(sp)
+        tr, got = _melody(sp)
+        if got is None:
+            continue
+        slots = list(_slots(sp))
+        ends = _phrase_ends(sp)
+        breath = int(M.BREATH_BEATS * PPQ)
+        for k, (si, p_end) in enumerate(ends):
+            inside = [n for n in got if n.end <= p_end and n.start < p_end and (k == 0 or n.start >= ends[k - 1][1])]
+            if not inside:
+                continue
+            last = inside[-1]
+            chord = next(c for s0, ln, c, _i, _s in slots if s0 <= last.start < s0 + ln)
+            assert last.pitch % 12 in M.chord_tones(chord)
+            is_final = k == len(ends) - 1
+            if not is_final:
+                room = p_end - breath - last.start >= int(M.MIN_NOTE_BEATS * PPQ)
+                assert (not room) or p_end - last.end >= breath, (sp.title, k, p_end - last.end)
+
+
+def test_no_leap_beyond_an_octave_and_leap_recovery_is_attempted(specs):
+    leaps = recovered = 0
+    for sp in specs:
+        tr, got = _melody(_v2(sp))
+        if got is None:
+            continue
+        for a, b in zip(got, got[1:]):
+            assert abs(b.pitch - a.pitch) <= M.LEAP_MAX, (sp.title, a.start, a.pitch, b.pitch)
+        for a, b, c in zip(got, got[1:], got[2:]):
+            if abs(b.pitch - a.pitch) >= M.LEAP_MIN:
+                leaps += 1
+                recovered += (c.pitch - b.pitch) * (b.pitch - a.pitch) < 0
+    # regression guard, not a quality claim: most leaps are answered by a move back (measured ~0.5 on the smoke set)
+    assert leaps and recovered / leaps >= 0.35, (recovered, leaps)
+
+
+@pytest.mark.parametrize("sig", TIME_SIGNATURES, ids=lambda s: f"{s[0]}-{s[1]}")
+def test_all_time_signatures_and_bar_counts(specs, sig):
+    base = specs[0]
+    for bars_list in ([1], [2], [3], [4], [5], [7], [9], [16], [32], [32, 32], [3, 1, 6], [32] * 2 + [4]):
+        sp = _resized(base, sig, bars_list)
+        midi = compile_spec(sp)
+        assert not check_midi(midi), (sig, bars_list)
+        assert midi == compile_spec(sp)
+        v1 = mido.MidiFile(file=io.BytesIO(compile_spec(sp.model_copy(update={"engine": None})))).length
+        assert mido.MidiFile(file=io.BytesIO(midi)).length == pytest.approx(v1)
+        tr, got = _melody(sp)
+        if got is None:
+            continue
+        lo, hi = effective_register(tr)
+        assert all(lo <= n.pitch <= hi for n in got)
+        assert all(abs(b.pitch - a.pitch) <= M.LEAP_MAX for a, b in zip(got, got[1:]))
+        total = sum(bars_list) * _ticks(beats_per_bar(sp))
+        assert got[-1].end == total and all(n.end <= total for n in got)
+
+
+def test_snap_keeps_the_motifs_direction_and_avoids_leaps():
+    ct = frozenset({0, 4, 7})
+    # raw 62 sits between 60 and 64 (a tie); the previous note 61 and a rising motif -> 64 (60 would fall)
+    assert M._snap(62, ct, 48, 84, 61, want=1) == 64
+    assert M._snap(62, ct, 48, 84, 63, want=-1) == 60
+    # a far chord tone is not chosen when a near one exists
+    assert abs(M._snap(70, ct, 48, 84, 67, want=0) - 67) <= 3
+
+
+def test_cadence_pitch_unit():
+    c = M.chord_tones_info("C")
+    assert (c.root, c.third, c.fifth) == (0, 4, 7)
+    assert M._cadence_pitch(c, 62, 64, True, 48, 84) == 60               # complete: the root nearest the line
+    assert M._cadence_pitch(c, 62, 71, True, 48, 84) == 64               # the root would leap > a fifth: the third
+    assert M._cadence_pitch(c, 62, 64, False, 48, 84) == 67              # half cadence: the fifth
+    # chord without a fifth in its tone list still returns a chord tone
+    d = M.chord_tones_info("Bdim")
+    assert M._cadence_pitch(d, 62, None, False, 48, 84) % 12 in d.tones

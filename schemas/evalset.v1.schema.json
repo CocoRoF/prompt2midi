@@ -70,6 +70,23 @@
           "default": null,
           "title": "Bars"
         },
+        "genre": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Genre"
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Genre"
+        },
         "instruments": {
           "anyOf": [
             {
@@ -158,6 +175,22 @@
       },
       "title": "Expect",
       "type": "object"
+    },
+    "Genre": {
+      "enum": [
+        "pop",
+        "rock",
+        "jazz",
+        "blues",
+        "ballad",
+        "bossa_nova",
+        "electronic",
+        "ambient",
+        "classical",
+        "lofi"
+      ],
+      "title": "Genre",
+      "type": "string"
     },
     "Mode": {
       "enum": [

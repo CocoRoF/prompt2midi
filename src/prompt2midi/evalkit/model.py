@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from ..intent import Genre
 from ..spec import Instrument, Mode, Tonic
 
 SET_VERSION = "1"
@@ -38,12 +39,15 @@ class Expect(_Strict):
     time_signature: Annotated[str, Field(pattern=SIGNATURE_PATTERN)] | None = None
     bars: Annotated[int, Field(ge=1, le=512)] | None = None
     instruments: list[Literal[tuple(EXPECT_INSTRUMENTS)]] | None = Field(default=None, min_length=1)  # type: ignore[valid-type]
+    # Optional (v0.4). Same list form and enum as Intent v1 `genre`. Today it only widens the scale-deviation limit
+    # for jazz/blues (연구 1팀, 평가_기준_초안 2-3); genre match (3-4) is a pending item and does not use it.
+    genre: Annotated[list[Genre], Field(min_length=1, max_length=3)] | None = None
 
-    @field_validator("instruments")
+    @field_validator("instruments", "genre")
     @classmethod
     def _unique(cls, v):
         if v is not None and len(set(v)) != len(v):
-            raise ValueError("instruments must not repeat")
+            raise ValueError("list items must not repeat")
         return v
 
 

@@ -503,4 +503,82 @@ def test_new_summary_is_deterministic_and_has_the_new_version(tmp_path):
         cli.main([str(write(tmp_path, SET5)), "--provider", "rule", "--tempo-tol", "0.1", "--out", str(tmp_path / d)])
     for f in ("results.csv", "summary.md"):
         assert (tmp_path / "a" / f).read_bytes() == (tmp_path / "b" / f).read_bytes()
-    assert f"`evalkit_version` {EVALKIT_VERSION}" in (tmp_path / "a" / "summary.md").read_text(encoding="utf-8") and EVALKIT_VERSION == "0.3.0"
+    assert f"`evalkit_version` {EVALKIT_VERSION}" in (tmp_path / "a" / "summary.md").read_text(encoding="utf-8") and EVALKIT_VERSION == "0.4.0"
+
+
+# ---------- v0.4: genre label (jazz/blues relax the scale-deviation limit to 25%) ----------
+
+def _deviating_midi(off_notes, total=100):
+    """`total` notes in C major (C D E G, repeated), of which the first `off_notes` are C# (outside C major)."""
+    in_scale = [60, 62, 64, 67]
+    pitches = [61 if i < off_notes else in_scale[i % 4] for i in range(total)]
+    return _midi([META, _notes(0, 0, pitches)])
+
+
+def _dev(off, genre=None, total=100):
+    exp = {"tonic": "C", "mode": "major"}
+    if genre is not None:
+        exp["genre"] = genre
+    return M.scale_deviation(_ctx(_deviating_midi(off, total), exp))
+
+
+def test_same_13_percent_deviation_depends_on_the_genre_label():
+    assert _dev(13).status == "fail"                                   # no genre label: limit 10% (unchanged behaviour)
+    assert _dev(13, ["pop"]).status == "fail"                          # a genre that is not jazz/blues: still 10%
+    for g in ("jazz", "blues"):
+        r = _dev(13, [g])
+        assert r.status == "pass" and "(재즈·블루스 완화 25%)" in r.reason and "≤25%" in r.reason and r.value == 0.13
+    assert "완화" not in _dev(13).reason and "≤10%" in _dev(13).reason
+    assert _dev(13, ["pop", "jazz"]).status == "pass"                  # jazz anywhere in the list relaxes it
+
+
+def test_relaxed_limit_boundaries():
+    assert _dev(10).status == "pass" and _dev(11).status == "fail"                        # default 10% (<=)
+    assert _dev(25, ["blues"]).status == "pass" and _dev(26, ["blues"]).status == "fail"  # relaxed 25% (<=)
+    assert _dev(13, ["jazz"], total=100).value == _dev(13, None, total=100).value          # the measured number does not change
+
+
+def test_genre_label_is_used_by_no_other_metric(tmp_path):
+    def run(genre):
+        d = copy.deepcopy(SET5)
+        for p in d["prompts"]:
+            p["expect"] = dict(p.get("expect") or {}, **({"genre": genre} if genre else {}))
+        r = run5(tmp_path, d)
+        return {i: {m: (x.status, x.reason, x.value) for m, x in r[i].results.items() if m != "scale_deviation"} for i in r}
+    assert run(["jazz"]) == run(None)
+
+
+def test_genre_in_labels_column_summary_header_and_schema(tmp_path):
+    d = copy.deepcopy(SET5)
+    d["prompts"][0]["expect"]["genre"] = ["jazz", "pop"]
+    out = tmp_path / "out"
+    assert cli.main([str(write(tmp_path, d)), "--provider", "fake", "--out", str(out)]) == 0
+    import csv
+    rows = {r["id"]: r for r in csv.DictReader(open(out / "results.csv", encoding="utf-8"))}
+    assert rows["p1"]["labels"] == "tonic;mode;tempo_bpm;time_signature;bars;instruments;genre" and "genre" not in rows["p2"]["labels"]
+    md = (out / "summary.md").read_text(encoding="utf-8")
+    assert "음계 이탈 ≤10% (genre 라벨에 jazz·blues 가 있으면 ≤25%)" in md and "`evalkit_version` 0.4.0" in md
+    assert list(rows["p1"]) == report.columns() and report.columns()[:len(V02_COLUMNS)] == V02_COLUMNS and report.columns()[-2:] == ["no_empty_tracks_value", "midi_instruments_included_value"]
+    props = model.json_schema()["$defs"]["Expect"]["properties"]
+    assert "genre" in props and "genre" not in model.json_schema()["$defs"]["Expect"].get("required", [])
+    assert set(model.json_schema()["$defs"]["Genre"]["enum"]) == {"pop", "rock", "jazz", "blues", "ballad", "bossa_nova", "electronic", "ambient", "classical", "lofi"}
+
+
+def test_old_sets_without_genre_stay_valid_and_bad_genre_is_rejected(tmp_path):
+    evalkit.load_set(write(tmp_path, SET5))                            # a v0.1-v0.3 style set: no genre anywhere
+    for bad in (["metal"], [], "jazz", ["jazz", "jazz"], ["pop", "rock", "jazz", "blues"]):
+        d = copy.deepcopy(SET5)
+        d["prompts"][0]["expect"]["genre"] = bad
+        with pytest.raises(evalkit.SetError):
+            evalkit.load_set(write(tmp_path, d))
+    # the same output as before for a set without genre labels: results are identical whether or not the field exists
+    assert run5(tmp_path)["p1"].results["scale_deviation"].status == "pass"
+
+
+def test_results_are_deterministic_with_genre_labels(tmp_path):
+    d = copy.deepcopy(SET5)
+    d["prompts"][1]["expect"]["genre"] = ["blues"]
+    for n in ("a", "b"):
+        cli.main([str(write(tmp_path, d)), "--provider", "rule", "--out", str(tmp_path / n)])
+    for f in ("results.csv", "summary.md"):
+        assert (tmp_path / "a" / f).read_bytes() == (tmp_path / "b" / f).read_bytes()

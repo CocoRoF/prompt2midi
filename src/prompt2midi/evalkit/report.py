@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from .expressiveness import COLUMN_PREFIX, INDICATORS
 from .metrics import AXIS1_METRICS, AXIS23_METRICS, DISPLAY_TITLES, EXTRACTION_METRICS, FAIL, LISTEN_COLUMNS, METRICS, NA, PASS, TEMPO_TOLERANCE_BPM, VALUE_METRICS, VALUE_METRICS_V03
 from .runner import ItemResult
 from .version import EVALKIT_VERSION
@@ -23,7 +24,7 @@ def columns() -> list[str]:
         cols += [m.name, m.name + "_reason"]
     cols += list(LISTEN_COLUMNS) + EXTRA_HEAD
     cols += [name + "_value" for name in VALUE_METRICS] + ["axis1_ok"]
-    return cols + list(ALIASES) + [name + "_value" for name in VALUE_METRICS_V03]
+    return cols + list(ALIASES) + [name + "_value" for name in VALUE_METRICS_V03] + [COLUMN_PREFIX + i.name for i in INDICATORS]
 
 
 def axis1_ok(r: ItemResult) -> bool:
@@ -46,6 +47,9 @@ def rows(results: list[ItemResult]) -> list[dict]:
         for name in (*VALUE_METRICS, *VALUE_METRICS_V03):
             v = r.results[name].value
             row[name + "_value"] = "" if v is None else v
+        for i in INDICATORS:  # v0.5: expressiveness proxy values, last columns; empty when not measurable
+            v = r.expr.get(i.name)
+            row[COLUMN_PREFIX + i.name] = "" if v is None else v
         row["axis1_ok"] = axis1_ok(r)
         for alias, src in ALIASES.items():
             row[alias] = row[src]
@@ -120,6 +124,13 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
               "| 그룹 | 재시도가 있었던 프롬프트 | 폴백으로 만든 프롬프트 | 생성 실패 |", "|---|---|---|---|"]
     for gname, g in groups:
         lines.append(f"| {gname} | {sum(r.attempts > 1 for r in g)}/{len(g)} | {sum(r.fallback_used for r in g)}/{len(g)} | {sum(not r.generated for r in g)}/{len(g)} |")
+    lines += ["", "## 표현력 대리 지표 (값 — 합격 판정도 음악 품질도 아님)", "",
+              "구조를 재는 대리 값이다. **값이 높거나 낮은 것이 좋은 음악·나쁜 음악을 뜻하지 않는다.** 정의·한계: `src/prompt2midi/evalkit/expressiveness.py`, 해석: `docs/baseline-expressiveness-v0.md`. CSV 열은 `expr_` 로 시작한다.", "",
+              "| 지표 | 측정된 곡 수 | 평균 | 최소 | 최대 |", "|---|---|---|---|---|"]
+    for ind in INDICATORS:
+        vals = [r.expr[ind.name] for r in results if r.expr.get(ind.name) is not None]
+        stats = f"{sum(vals) / len(vals):.4f} | {min(vals):.4f} | {max(vals):.4f}" if vals else "— | — | —"
+        lines.append(f"| {ind.title} (`{COLUMN_PREFIX}{ind.name}`) | {len(vals)}/{n} | {stats} |")
     lines += ["", "## 청취가 필요한 항목", "",
               f"무드 부합·음악성은 **점수화하지 않는다.** CSV 의 `{LISTEN_COLUMNS[0]}`, `{LISTEN_COLUMNS[1]}` 열은 전 {n}개 모두 `{LISTEN_TEXT}`이며 청취 루브릭(연구 1팀)으로 채점한다.", ""]
     fails = [(r.id, m.name, r.results[m.name].reason) for r in results for m in METRICS if r.results[m.name].status == FAIL]

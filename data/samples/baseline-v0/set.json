@@ -1,0 +1,203 @@
+{
+  "version": "1",
+  "name": "baseline-v0 samples (연구 1팀 영어 10 + smoke 6)",
+  "prompts": [
+    {
+      "id": "r01",
+      "lang": "en",
+      "tier": "A",
+      "text": "A calm and relaxing piano piece in C major with a 4/4 time signature, moving at a slow Adagio tempo of about 70 BPM. It evokes peace and serenity.",
+      "expect": {
+        "tonic": "C",
+        "mode": "major",
+        "tempo_bpm": 70
+      }
+    },
+    {
+      "id": "r02",
+      "lang": "en",
+      "tier": "A",
+      "text": "A sad and melancholic song for piano and strings in A minor, 4/4 time signature, at a slow tempo of about 60 BPM, with a deeply emotional feel.",
+      "expect": {
+        "tonic": "A",
+        "mode": "minor",
+        "tempo_bpm": 60
+      }
+    },
+    {
+      "id": "r03",
+      "lang": "en",
+      "tier": "A",
+      "text": "A cheerful and upbeat pop song with acoustic guitar, bass and drums in G major, 4/4 time signature, at a lively tempo of about 120 BPM, evoking happiness.",
+      "expect": {
+        "tonic": "G",
+        "mode": "major",
+        "tempo_bpm": 120
+      }
+    },
+    {
+      "id": "r04",
+      "lang": "en",
+      "tier": "A",
+      "text": "An energetic rock track featuring electric guitar, electric bass and drums in E minor, 4/4 time signature, at a fast tempo of about 140 BPM, with a powerful and intense mood.",
+      "expect": {
+        "tonic": "E",
+        "mode": "minor",
+        "tempo_bpm": 140
+      }
+    },
+    {
+      "id": "r05",
+      "lang": "en",
+      "tier": "A",
+      "text": "A dark and mysterious cinematic piece for string ensemble and low brass in D minor, 4/4 time signature, at a moderate tempo of about 80 BPM, creating tension.",
+      "expect": {
+        "tonic": "D",
+        "mode": "minor",
+        "tempo_bpm": 80
+      }
+    },
+    {
+      "id": "r06",
+      "lang": "en",
+      "tier": "A",
+      "text": "A relaxing lo-fi jazz piece with electric piano, soft bass and light drums in F major, 4/4 time signature, at a laid-back tempo of about 85 BPM.",
+      "expect": {
+        "tonic": "F",
+        "mode": "major",
+        "tempo_bpm": 85
+      }
+    },
+    {
+      "id": "r07",
+      "lang": "en",
+      "tier": "A",
+      "text": "An epic and heroic orchestral piece with strings, brass and timpani in D major, 4/4 time signature, at a tempo of about 100 BPM, with a triumphant mood.",
+      "expect": {
+        "tonic": "D",
+        "mode": "major",
+        "tempo_bpm": 100
+      }
+    },
+    {
+      "id": "r08",
+      "lang": "en",
+      "tier": "A",
+      "text": "A romantic and tender ballad for piano and violin in B-flat major, 3/4 time signature, at a gentle tempo of about 90 BPM, full of warmth and love.",
+      "expect": {
+        "tonic": "Bb",
+        "mode": "major",
+        "tempo_bpm": 90
+      }
+    },
+    {
+      "id": "r09",
+      "lang": "en",
+      "tier": "A",
+      "text": "A playful and bouncy electronic dance track with synth lead, synth bass and drums in C major, 4/4 time signature, at a fast tempo of about 132 BPM.",
+      "expect": {
+        "tonic": "C",
+        "mode": "major",
+        "tempo_bpm": 132
+      }
+    },
+    {
+      "id": "r10",
+      "lang": "en",
+      "tier": "A",
+      "text": "A meditative ambient composition with soft pads, harp and flute in G minor, 4/4 time signature, at a very slow tempo of about 55 BPM, evoking relaxation and calm.",
+      "expect": {
+        "tonic": "G",
+        "mode": "minor",
+        "tempo_bpm": 55
+      }
+    },
+    {
+      "id": "s07",
+      "lang": "ko",
+      "tier": "A",
+      "text": "새벽 드라이브에 어울리는 재즈 피아노와 색소폰, A단조, 느리게",
+      "expect": {
+        "tonic": "A",
+        "mode": "minor",
+        "instruments": [
+          "piano",
+          "sax"
+        ]
+      }
+    },
+    {
+      "id": "s08",
+      "lang": "ko",
+      "tier": "A",
+      "text": "어두운 영화 장면용 패드와 베이스, F 프리지안",
+      "expect": {
+        "tonic": "F",
+        "mode": "phrygian",
+        "instruments": [
+          "synth_pad",
+          "electric_bass"
+        ]
+      }
+    },
+    {
+      "id": "e03",
+      "lang": "en",
+      "tier": "A",
+      "text": "Late-night lo-fi study beats on electric piano, relaxed, 78 BPM",
+      "expect": {
+        "tempo_bpm": 78,
+        "instruments": [
+          "electric_piano"
+        ]
+      }
+    },
+    {
+      "id": "e06",
+      "lang": "en",
+      "tier": "A",
+      "text": "Bossa nova tune with nylon guitar and flute in A minor at 120 BPM",
+      "expect": {
+        "tonic": "A",
+        "mode": "minor",
+        "tempo_bpm": 120,
+        "instruments": [
+          "nylon_guitar",
+          "flute"
+        ]
+      }
+    },
+    {
+      "id": "e07",
+      "lang": "en",
+      "tier": "A",
+      "text": "Fast electronic dance track with synth lead, synth bass and drums, 128 BPM, 4/4, C minor.",
+      "expect": {
+        "tonic": "C",
+        "mode": "minor",
+        "tempo_bpm": 128,
+        "time_signature": "4/4",
+        "instruments": [
+          "synth_lead",
+          "synth_bass",
+          "drums"
+        ]
+      }
+    },
+    {
+      "id": "e09",
+      "lang": "en",
+      "tier": "A",
+      "text": "Blues shuffle with organ and electric guitar in E major at 92 BPM",
+      "expect": {
+        "tonic": "E",
+        "mode": "major",
+        "tempo_bpm": 92,
+        "instruments": [
+          "organ",
+          "steel_guitar"
+        ]
+      }
+    }
+  ]
+}

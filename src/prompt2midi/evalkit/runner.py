@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from ..pipeline import GenerationError, generate
 from ..providers import FakeProvider, RuleProvider
 from ..spec import total_bars
+from .expressiveness import measure
 from .metrics import METRICS, Context, Result
 from .model import EvalSet
 
@@ -54,6 +55,7 @@ class ItemResult:
     bars: int | None
     midi_sha8: str
     results: dict[str, Result] = field(default_factory=dict)
+    expr: dict[str, float | None] = field(default_factory=dict)  # expressiveness proxy VALUES (no verdicts)
 
 
 def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_retries: int = 2, check_determinism: bool = True, tempo_tol: float | None = None) -> list[ItemResult]:
@@ -82,5 +84,6 @@ def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_ret
             item.id, item.lang, item.tier, midi is not None, provider, labels_of(item), err, used if midi is not None else "", attempts, fb,
             total_bars(spec) if spec is not None else None, hashlib.sha256(midi).hexdigest()[:8] if midi else "",
             {m.name: m.fn(ctx) for m in METRICS},
+            measure(midi, spec, item.expect),
         ))
     return out

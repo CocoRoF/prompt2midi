@@ -22,7 +22,7 @@ SET5 = {
         {"id": "p1", "lang": "en", "tier": "A", "text": "labels all right",
          "expect": {"tonic": "C", "mode": "major", "tempo_bpm": 100, "time_signature": "4/4", "bars": 12, "instruments": ["piano", "drums"]}},
         {"id": "p2", "lang": "ko", "tier": "A", "text": "라벨이 모두 틀림",
-         "expect": {"tonic": "D", "mode": "minor", "tempo_bpm": 120, "time_signature": "3/4", "bars": 16, "instruments": ["violin"]}},
+         "expect": {"tonic": "F#", "mode": "minor", "tempo_bpm": 120, "time_signature": "3/4", "bars": 16, "instruments": ["violin"]}},
         {"id": "p3", "lang": "en", "tier": "B", "text": "no labels at all"},
         {"id": "p4", "lang": "ko", "tier": "B", "text": "라벨 일부만", "expect": {"tonic": "C"}},
         {"id": "p5", "lang": "ko", "tier": "C", "text": "네 마디만", "expect": {"bars": 4}},
@@ -212,3 +212,100 @@ def test_rule_provider_on_the_research_prompts(tmp_path):
     r = run5(tmp_path, {"version": "1", "name": "research10", "prompts": prompts}, provider="rule")
     for m in ("tempo_match", "key_match", "time_signature_match", "midicheck_valid", "deterministic", "bars_min"):
         assert [r[i].results[m].status for i in r] == ["pass"] * 10, m
+
+
+# ---------- metrics added for the 연구 1팀 item map (docs/eval-metrics.md section 3) ----------
+
+import io
+
+import mido
+
+from prompt2midi.evalkit import metrics as M
+from prompt2midi.spec import MusicSpec
+
+
+def _midi(tracks, ppq=480):
+    """tracks: list of event lists [(abs_tick, mido.Message|MetaMessage)] -> bytes. Track 0 carries tempo and meter."""
+    mid = mido.MidiFile(type=1, ticks_per_beat=ppq)
+    for evs in tracks:
+        tr = mido.MidiTrack()
+        t = 0
+        for tick, msg in sorted(evs, key=lambda e: e[0]):
+            tr.append(msg.copy(time=tick - t))
+            t = tick
+        tr.append(mido.MetaMessage("end_of_track", time=0))
+        mid.tracks.append(tr)
+    buf = io.BytesIO()
+    mid.save(file=buf)
+    return buf.getvalue()
+
+
+def _ctx(midi, expect=None):
+    spec = MusicSpec.model_validate(runner.FAKE_SPEC)
+    return M.Context(model.Expect.model_validate(expect) if expect else None, spec, midi)
+
+
+META = [(0, mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(100))), (0, mido.MetaMessage("time_signature", numerator=4, denominator=4))]
+
+
+def _notes(channel, program, pitches):
+    ev = [(0, mido.Message("program_change", channel=channel, program=program))]
+    for i, p in enumerate(pitches):
+        ev += [(i * 480, mido.Message("note_on", channel=channel, note=p, velocity=80)), (i * 480 + 240, mido.Message("note_off", channel=channel, note=p, velocity=0))]
+    return ev
+
+
+def test_pitch_range_uses_the_instrument_of_the_channel():
+    ok = _midi([META, _notes(0, 0, [60, 62, 64, 65])])                      # piano 21..108
+    assert M.pitch_range(_ctx(ok)).status == "pass"
+    low = _midi([META, _notes(0, 40, [40, 41, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84, 86, 88, 90])])  # violin >= 55: 2 of 20 = 10%
+    r = M.pitch_range(_ctx(low))
+    assert r.status == "fail" and "2/20" in r.reason
+    drums_only = _midi([META, _notes(9, 0, [36, 38])])
+    assert M.pitch_range(_ctx(drums_only)).status == "na"
+
+
+def test_note_integrity_counts_zero_length_and_unpaired_notes():
+    assert M.note_integrity(_ctx(_midi([META, _notes(0, 0, [60, 62])]))).status == "pass"
+    zero = [(0, mido.Message("note_on", channel=0, note=60, velocity=80)), (0, mido.Message("note_off", channel=0, note=60, velocity=0))]
+    assert M.note_integrity(_ctx(_midi([META, zero]))).status == "fail"      # MidiCheck only warns about this
+    hanging = [(0, mido.Message("note_on", channel=0, note=60, velocity=80))]
+    r = M.note_integrity(_ctx(_midi([META, hanging])))
+    assert r.status == "fail" and "never turned off" in r.reason
+
+
+def test_no_empty_tracks_ignores_the_meta_track_only():
+    assert M.no_empty_tracks(_ctx(_midi([META, _notes(0, 0, [60])]))).status == "pass"
+    r = M.no_empty_tracks(_ctx(_midi([META, _notes(0, 0, [60]), [(0, mido.Message("program_change", channel=1, program=33))]])))
+    assert r.status == "fail" and "1개" in r.reason
+
+
+def test_midi_instruments_included_reads_program_changes_and_drum_channel():
+    midi = _midi([META, _notes(0, 0, [60]), _notes(1, 33, [40]), _notes(9, 0, [36])])
+    assert M.midi_instruments_included(_ctx(midi, {"instruments": ["piano", "electric_bass", "drums"]})).status == "pass"
+    r = M.midi_instruments_included(_ctx(midi, {"instruments": ["piano", "violin"]}))
+    assert r.status == "fail" and "violin" in r.reason
+    assert M.midi_instruments_included(_ctx(midi)).status == "na"
+    # a track whose program is piano but that has no notes does not count as 'present'
+    assert M.midi_instruments_included(_ctx(_midi([META, _notes(0, 0, [60]), [(0, mido.Message("program_change", channel=2, program=40))]]), {"instruments": ["violin"]})).status == "fail"
+
+
+def test_scale_deviation_uses_the_labelled_key_and_needs_both_labels():
+    c_major = _midi([META, _notes(0, 0, [60, 62, 64, 65, 67, 69, 71, 72, 74, 76])])
+    assert M.scale_deviation(_ctx(c_major, {"tonic": "C", "mode": "major"})).status == "pass"
+    # D minor = D E F G A Bb C: the single B of 10 notes is outside -> exactly 10% is still allowed (<=)
+    assert M.scale_deviation(_ctx(c_major, {"tonic": "D", "mode": "minor"})).status == "pass"
+    more_b = _midi([META, _notes(0, 0, [60, 62, 64, 65, 67, 69, 71, 71, 74, 76])])  # two Bs -> 20%
+    r = M.scale_deviation(_ctx(more_b, {"tonic": "D", "mode": "minor"}))
+    assert r.status == "fail" and "2/10" in r.reason
+    assert M.scale_deviation(_ctx(c_major, {"tonic": "C"})).status == "na"
+    assert M.scale_deviation(_ctx(c_major)).status == "na"
+    assert M.scale_deviation(_ctx(_midi([META, _notes(9, 0, [36, 38])]), {"tonic": "C", "mode": "major"})).status == "na"  # drums are not pitched
+
+
+def test_new_metrics_in_the_five_item_set(tmp_path):
+    r = run5(tmp_path)
+    assert st(r, "p1", "scale_deviation") == "pass" and st(r, "p2", "scale_deviation") == "fail"
+    assert st(r, "p4", "scale_deviation") == "na" and st(r, "p3", "scale_deviation") == "na"   # only one label / none
+    assert st(r, "p1", "midi_instruments_included") == "pass" and st(r, "p2", "midi_instruments_included") == "fail"
+    assert all(st(r, i, m) == "pass" for i in r for m in ("pitch_range", "note_integrity", "no_empty_tracks"))

@@ -3,7 +3,7 @@
 
 사용:  python tools/browser_check.py [--out out/browser] [--port 8791]
 필요:  pip install -r tools/requirements-ci.txt  후  python -m playwright install chromium
-동작:  임시 데이터 디렉터리로 uvicorn 을 직접 띄우고(서버 로그에서 설정 토큰을 읽음), 브라우저로 흐름을 따라 하며
+동작:  임시 데이터 디렉터리로 `python -m prompt2midi.api` 서버를 띄우고(서버 로그에서 설정 토큰을 읽음), 브라우저로 흐름을 따라 하며
        단언한다. 하나라도 실패하면 종료 코드 1. 스크린샷은 --out 에 저장한다(CI 는 아티팩트로 올림).
 외부 네트워크·LLM 호출 없음: Rule 공급자만 쓰고, 가짜 키는 저장만 하며 "연결 테스트"는 확인 창만 보고 취소한다.
 """
@@ -48,7 +48,7 @@ def start_server(port: int, data_dir: str, log_path: Path) -> tuple[subprocess.P
     env.pop("P2M_LIVE", None)
     log = open(log_path, "w", encoding="utf-8")
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "prompt2midi.api.app:app", "--host", "127.0.0.1", "--port", str(port), "--no-proxy-headers"],
+        [sys.executable, "-m", "prompt2midi.api", "--host", "127.0.0.1", "--port", str(port), "--data-dir", data_dir],  # 진입점이 proxy_headers=False 로 띄운다
         stdout=log, stderr=subprocess.STDOUT, env=env,
     )
     deadline = time.time() + 40

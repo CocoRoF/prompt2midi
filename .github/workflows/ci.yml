@@ -38,3 +38,13 @@ jobs:
         run: python tools/scan_secrets.py
       - name: Dependency license record
         run: python tools/check_licenses.py
+
+  docker:
+    # 이미지를 빌드만 하고(push·레지스트리 로그인 없음) 컨테이너를 띄워 점검한다.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (push 하지 않음)
+        run: docker build -t prompt2midi:ci .
+      - name: Run container and assert
+        run: bash tools/docker_check.sh prompt2midi:ci

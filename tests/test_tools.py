@@ -57,3 +57,18 @@ def test_license_check_reports_missing(tmp_path):
 def test_license_check_passes_for_this_repo():
     r = subprocess.run([sys.executable, "tools/check_licenses.py"], cwd=ROOT, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+def test_ci_status_renders_snapshot():
+    sys.path.insert(0, str(ROOT / "tools"))
+    try:
+        import ci_status
+    finally:
+        sys.path.remove(str(ROOT / "tools"))
+    data = {"total_count": 2, "check_runs": [
+        {"name": "test (3.12)", "status": "completed", "conclusion": "success", "started_at": "t0", "completed_at": "t1", "html_url": "https://example.test/1"},
+        {"name": "docker", "status": "in_progress", "conclusion": None, "started_at": "t0", "completed_at": None, "html_url": "https://example.test/2"},
+    ]}
+    md = ci_status.render("o/r", "abc123", data, "2026-01-01 00:00")
+    assert "abc123" in md and "스냅샷" in md and "자동으로 갱신되지 않는" in md
+    assert "| docker | in_progress | - |" in md and "| test (3.12) | completed | success |" in md

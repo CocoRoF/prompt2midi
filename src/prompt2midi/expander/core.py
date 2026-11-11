@@ -14,7 +14,7 @@ from ..intent import Intent
 from ..presets import DEFAULT_TONIC, MOODS, MOTIFS, PROGRESSIONS, diatonic_chord
 from ..spec import PITCH_CLASS, MusicSpec
 from ..validate import Issue, validate_spec
-from .presets import GENRES, assign_instruments
+from .presets import GENRES, assign_instruments, assign_instruments_fill
 
 DEFAULT_BARS = 12
 DEFAULT_MOOD = "calm"  # global default mood preset when the Intent names none
@@ -73,7 +73,11 @@ def _beats_per_bar(sig: str) -> float:
     return 4 * n / d
 
 
-def expand(intent: Intent) -> Expansion:
+def expand(intent: Intent, *, instruments_mode: str = "ensemble") -> Expansion:
+    """Intent -> MusicSpec. `instruments_mode`: 'ensemble' (default; listed instruments are the whole band) or 'fill' (listed
+    instruments take their roles, every other role gets the genre/mood/legacy default; used by the RuleProvider)."""
+    if instruments_mode not in ("ensemble", "fill"):
+        raise ValueError(f"unknown instruments_mode {instruments_mode!r}")
     ex: list[Decision] = []
 
     def note(field_name: str, value: Any, source: str, rule: str) -> None:
@@ -167,7 +171,32 @@ def expand(intent: Intent) -> Expansion:
 
     # ---- instruments and roles ----
     drum_style = None
-    if intent.instruments:
+    if instruments_mode == "fill":
+        listed = [i.value for i in intent.instruments]
+        roles, drums_listed, ignored = assign_instruments_fill(listed)
+        named = dict(roles)
+        for ins, why in ignored:
+            note("instruments.ignored", ins, "intent", why)
+        if g is not None:
+            for role, ins in g.roles.items():
+                roles.setdefault(role, ins)
+        roles.setdefault("melody", "piano")
+        if "pad" not in roles and primary_mood in ("meditative", "epic"):
+            roles["pad"] = "synth_pad"
+        if g is not None:
+            want_drums = drums_listed or g.has_drums
+        else:
+            want_drums = drums_listed or energy >= 0.7
+        if "chords" not in roles and "pad" not in roles and energy < 0.7:
+            roles["chords"] = "electric_piano" if roles["melody"] == "piano" else "piano"
+        if want_drums:
+            drum_style, d_src = _drum_style(g, g_src, energy)
+        if "bass" not in roles and (want_drums or energy >= 0.4):
+            roles["bass"] = "electric_bass"
+        note("instruments", roles | ({"drums": True} if want_drums else {}), "intent" if named or drums_listed else (g_src if (g and g.roles) else "default"),
+             "named instruments take their roles first; other roles are filled: genre instruments, melody piano, pad for meditative/epic, "
+             "chords if no pad and energy < 0.7, bass if drums or energy >= 0.4, drums if listed or from the genre or (no genre) energy >= 0.7")
+    elif intent.instruments:
         listed = [i.value for i in intent.instruments]
         roles, drums_listed, ignored = assign_instruments(listed)
         note("instruments", roles | ({"drums": True} if drums_listed else {}), "intent", "explicit ensemble: only the listed instruments play (role order: melody > chords > pad; bass/pad types first)")

@@ -1,0 +1,277 @@
+{
+  "version": "1",
+  "name": "Rule-provider development smoke set (20 prompts, written for the Intent-path migration; NOT the research evaluation set and unrelated to the holdout)",
+  "prompts": [
+    {
+      "id": "s01",
+      "lang": "ko",
+      "tier": "A",
+      "text": "작은 카페에서 흐르는 잔잔한 어쿠스틱 기타 곡, 느긋하게 연주하는 D장조",
+      "expect": {
+        "tonic": "D",
+        "mode": "major",
+        "instruments": [
+          "nylon_guitar"
+        ]
+      }
+    },
+    {
+      "id": "s02",
+      "lang": "ko",
+      "tier": "A",
+      "text": "비 내리는 밤을 위한 슬픈 피아노 소품, 올림바단조, 4분의 3박자",
+      "expect": {
+        "tonic": "F#",
+        "mode": "minor",
+        "time_signature": "3/4",
+        "instruments": [
+          "piano"
+        ]
+      }
+    },
+    {
+      "id": "s03",
+      "lang": "ko",
+      "tier": "A",
+      "text": "내림마장조로 연주하는 따뜻한 플루트 곡, 72 BPM",
+      "expect": {
+        "tonic": "Eb",
+        "mode": "major",
+        "tempo_bpm": 72,
+        "instruments": [
+          "flute"
+        ]
+      }
+    },
+    {
+      "id": "s04",
+      "lang": "ko",
+      "tier": "A",
+      "text": "신나는 일렉트릭 기타와 드럼이 이끄는 록 음악, 라단조, 140 BPM",
+      "expect": {
+        "tonic": "D",
+        "mode": "minor",
+        "tempo_bpm": 140,
+        "instruments": [
+          "steel_guitar",
+          "drums"
+        ]
+      }
+    },
+    {
+      "id": "s05",
+      "lang": "ko",
+      "tier": "A",
+      "text": "아다지오로 연주하는 바이올린과 피아노 이중주, 사장조",
+      "expect": {
+        "tonic": "G",
+        "mode": "major",
+        "instruments": [
+          "violin",
+          "piano"
+        ]
+      }
+    },
+    {
+      "id": "s06",
+      "lang": "ko",
+      "tier": "A",
+      "text": "8분의 6박자의 경쾌한 클라리넷 곡, 마단조",
+      "expect": {
+        "tonic": "E",
+        "mode": "minor",
+        "time_signature": "6/8",
+        "instruments": [
+          "clarinet"
+        ]
+      }
+    },
+    {
+      "id": "s07",
+      "lang": "ko",
+      "tier": "A",
+      "text": "새벽 드라이브에 어울리는 재즈 피아노와 색소폰, A단조, 느리게",
+      "expect": {
+        "tonic": "A",
+        "mode": "minor",
+        "instruments": [
+          "piano",
+          "sax"
+        ]
+      }
+    },
+    {
+      "id": "s08",
+      "lang": "ko",
+      "tier": "A",
+      "text": "어두운 영화 장면용 패드와 베이스, F 프리지안",
+      "expect": {
+        "tonic": "F",
+        "mode": "phrygian",
+        "instruments": [
+          "synth_pad",
+          "electric_bass"
+        ]
+      }
+    },
+    {
+      "id": "s09",
+      "lang": "ko",
+      "tier": "A",
+      "text": "다장조 5박자 마림바 연습곡",
+      "expect": {
+        "tonic": "C",
+        "mode": "major",
+        "time_signature": "5/4",
+        "instruments": [
+          "marimba"
+        ]
+      }
+    },
+    {
+      "id": "s10",
+      "lang": "ko",
+      "tier": "A",
+      "text": "아무 조건 없이 편안한 곡"
+    },
+    {
+      "id": "e01",
+      "lang": "en",
+      "tier": "A",
+      "text": "A gentle waltz for solo piano in B-flat major, 3/4, around 84 BPM.",
+      "expect": {
+        "tonic": "Bb",
+        "mode": "major",
+        "time_signature": "3/4",
+        "tempo_bpm": 84,
+        "instruments": [
+          "piano"
+        ]
+      }
+    },
+    {
+      "id": "e02",
+      "lang": "en",
+      "tier": "A",
+      "text": "Upbeat funk groove with electric bass, drums and a brass section in E minor at 108 BPM",
+      "expect": {
+        "tonic": "E",
+        "mode": "minor",
+        "tempo_bpm": 108,
+        "instruments": [
+          "electric_bass",
+          "drums",
+          "trumpet"
+        ]
+      }
+    },
+    {
+      "id": "e03",
+      "lang": "en",
+      "tier": "A",
+      "text": "Late-night lo-fi study beats on electric piano, relaxed, 78 BPM",
+      "expect": {
+        "tempo_bpm": 78,
+        "instruments": [
+          "electric_piano"
+        ]
+      }
+    },
+    {
+      "id": "e04",
+      "lang": "en",
+      "tier": "A",
+      "text": "A slow, melancholic piece for violin in F# minor.",
+      "expect": {
+        "tonic": "F#",
+        "mode": "minor",
+        "instruments": [
+          "violin"
+        ]
+      }
+    },
+    {
+      "id": "e05",
+      "lang": "en",
+      "tier": "A",
+      "text": "Cinematic strings and low brass building to an epic finale in D dorian, 96 BPM",
+      "expect": {
+        "tonic": "D",
+        "mode": "dorian",
+        "tempo_bpm": 96,
+        "instruments": [
+          "strings",
+          "trumpet"
+        ]
+      }
+    },
+    {
+      "id": "e06",
+      "lang": "en",
+      "tier": "A",
+      "text": "Bossa nova tune with nylon guitar and flute in A minor at 120 BPM",
+      "expect": {
+        "tonic": "A",
+        "mode": "minor",
+        "tempo_bpm": 120,
+        "instruments": [
+          "nylon_guitar",
+          "flute"
+        ]
+      }
+    },
+    {
+      "id": "e07",
+      "lang": "en",
+      "tier": "A",
+      "text": "Fast electronic dance track with synth lead, synth bass and drums, 128 BPM, 4/4, C minor.",
+      "expect": {
+        "tonic": "C",
+        "mode": "minor",
+        "tempo_bpm": 128,
+        "time_signature": "4/4",
+        "instruments": [
+          "synth_lead",
+          "synth_bass",
+          "drums"
+        ]
+      }
+    },
+    {
+      "id": "e08",
+      "lang": "en",
+      "tier": "A",
+      "text": "Quiet ambient pads and a flute in G mixolydian, 60 BPM.",
+      "expect": {
+        "tonic": "G",
+        "mode": "mixolydian",
+        "tempo_bpm": 60,
+        "instruments": [
+          "synth_pad",
+          "flute"
+        ]
+      }
+    },
+    {
+      "id": "e09",
+      "lang": "en",
+      "tier": "A",
+      "text": "Blues shuffle with organ and electric guitar in E major at 92 BPM",
+      "expect": {
+        "tonic": "E",
+        "mode": "major",
+        "tempo_bpm": 92,
+        "instruments": [
+          "organ",
+          "steel_guitar"
+        ]
+      }
+    },
+    {
+      "id": "e10",
+      "lang": "en",
+      "tier": "A",
+      "text": "Something nice for the evening"
+    }
+  ]
+}

@@ -1,0 +1,311 @@
+{
+ "bass": {
+  "electric_bass": [
+   "electric bass",
+   "bass guitar",
+   "bass",
+   "베이스"
+  ],
+  "synth_bass": [
+   "synth bass",
+   "신스 베이스"
+  ],
+  "upright_bass": [
+   "upright bass",
+   "double bass",
+   "contrabass",
+   "더블베이스"
+  ]
+ },
+ "drums": [
+  "drum",
+  "drums",
+  "percussion",
+  "timpani",
+  "beat",
+  "드럼",
+  "타악"
+ ],
+ "instruments": {
+  "clarinet": [
+   "clarinet",
+   "클라리넷"
+  ],
+  "electric_piano": [
+   "electric piano",
+   "rhodes",
+   "일렉트릭 피아노"
+  ],
+  "flute": [
+   "flute",
+   "플루트",
+   "피리"
+  ],
+  "marimba": [
+   "marimba",
+   "xylophone",
+   "마림바"
+  ],
+  "nylon_guitar": [
+   "acoustic guitar",
+   "nylon guitar",
+   "guitar",
+   "harp",
+   "기타",
+   "하프"
+  ],
+  "organ": [
+   "organ",
+   "오르간"
+  ],
+  "piano": [
+   "piano",
+   "피아노"
+  ],
+  "sax": [
+   "saxophone",
+   "sax",
+   "색소폰"
+  ],
+  "steel_guitar": [
+   "electric guitar",
+   "steel guitar",
+   "일렉기타",
+   "일렉트릭 기타"
+  ],
+  "strings": [
+   "string ensemble",
+   "strings",
+   "현악"
+  ],
+  "synth_lead": [
+   "synth lead",
+   "lead synth",
+   "신스 리드"
+  ],
+  "trumpet": [
+   "trumpet",
+   "brass",
+   "트럼펫"
+  ],
+  "violin": [
+   "violin",
+   "바이올린"
+  ]
+ },
+ "moods": {
+  "calm": [
+   "calm",
+   "peace",
+   "serene",
+   "serenity",
+   "gentle",
+   "soft",
+   "잔잔",
+   "평화",
+   "고요"
+  ],
+  "dark": [
+   "dark",
+   "mysterious",
+   "tension",
+   "ominous",
+   "eerie",
+   "어두운",
+   "긴장",
+   "미스터리"
+  ],
+  "energetic": [
+   "energetic",
+   "powerful",
+   "intense",
+   "driving",
+   "aggressive",
+   "에너지",
+   "강렬",
+   "격렬"
+  ],
+  "epic": [
+   "epic",
+   "heroic",
+   "triumphant",
+   "grand",
+   "cinematic",
+   "웅장",
+   "영웅"
+  ],
+  "happy": [
+   "happy",
+   "cheerful",
+   "upbeat",
+   "joy",
+   "joyful",
+   "bright",
+   "행복",
+   "신나는",
+   "밝은"
+  ],
+  "meditative": [
+   "meditative",
+   "meditation",
+   "ambient",
+   "zen",
+   "명상",
+   "앰비언트"
+  ],
+  "playful": [
+   "playful",
+   "bouncy",
+   "fun",
+   "quirky",
+   "경쾌",
+   "장난"
+  ],
+  "relaxing": [
+   "relax",
+   "relaxing",
+   "laid-back",
+   "laid back",
+   "chill",
+   "lo-fi",
+   "lofi",
+   "편안",
+   "여유"
+  ],
+  "romantic": [
+   "romantic",
+   "tender",
+   "love",
+   "warmth",
+   "warm",
+   "로맨틱",
+   "사랑",
+   "따뜻"
+  ],
+  "sad": [
+   "sad",
+   "melancholic",
+   "melancholy",
+   "sorrow",
+   "grief",
+   "lonely",
+   "슬픈",
+   "슬픔",
+   "우울"
+  ]
+ },
+ "pad_words": [
+  "pad",
+  "pads",
+  "ambient",
+  "ensemble",
+  "orchestral",
+  "orchestra",
+  "strings",
+  "string ensemble",
+  "패드",
+  "오케스트라",
+  "현악"
+ ],
+ "style_words": {
+  "bossa": [
+   "bossa",
+   "samba",
+   "보사노바"
+  ],
+  "four_on_floor": [
+   "dance",
+   "electronic",
+   "edm",
+   "house",
+   "techno",
+   "disco",
+   "댄스",
+   "일렉트로닉"
+  ],
+  "half_time": [
+   "ballad",
+   "ambient",
+   "slow",
+   "cinematic",
+   "발라드"
+  ],
+  "rock_basic": [
+   "rock",
+   "pop",
+   "punk",
+   "metal",
+   "록",
+   "팝"
+  ],
+  "shuffle": [
+   "jazz",
+   "swing",
+   "blues",
+   "shuffle",
+   "재즈",
+   "스윙"
+  ]
+ },
+ "tempo": [
+  {
+   "bpm": 55,
+   "words": [
+    "very slow",
+    "largo",
+    "아주 느린"
+   ]
+  },
+  {
+   "bpm": 66,
+   "words": [
+    "slow",
+    "adagio",
+    "느린",
+    "느리게"
+   ]
+  },
+  {
+   "bpm": 85,
+   "words": [
+    "laid-back",
+    "laid back",
+    "relaxed pace"
+   ]
+  },
+  {
+   "bpm": 96,
+   "words": [
+    "moderate",
+    "andante",
+    "moderato",
+    "보통"
+   ]
+  },
+  {
+   "bpm": 120,
+   "words": [
+    "lively",
+    "allegro",
+    "brisk"
+   ]
+  },
+  {
+   "bpm": 140,
+   "words": [
+    "fast",
+    "quick",
+    "빠른",
+    "빠르게"
+   ]
+  },
+  {
+   "bpm": 170,
+   "words": [
+    "very fast",
+    "presto",
+    "아주 빠른"
+   ]
+  }
+ ]
+}

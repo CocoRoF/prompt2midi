@@ -1,9 +1,8 @@
 """RuleProvider: Korean key / meter / genre / tempo words.
 
-Fixed here: explicit keys and time signatures in Korean (tonic+mode and meter are already fields of MusicSpec).
-NOT fixed here (xfail, strict): genre -> drum style / instruments. The genre vocabulary waits for the shared
-Intent v1 schema (genre enum); the xfail tests record the wanted behaviour and will fail loudly (XPASS strict)
-as soon as a fix makes them pass, so the marker must then be removed.
+Explicit keys and time signatures in Korean, Korean tempo terms, and genre words (now extracted into Intent.genre and applied by the
+expander's genre presets). The one remaining xfail is waltz -> 3/4: a meter inferred from a genre word is a musical decision (not
+extraction) and `waltz` is not in the agreed genre enum.
 """
 import pytest
 
@@ -159,23 +158,18 @@ def test_tempo_words_that_work_today():
     assert RULE.generate_spec("calm piece 90 BPM")["tempo_bpm"] == 90
 
 
-@pytest.mark.xfail(strict=True, reason="Korean/Italian tempo terms (아다지오, 알레그로, 모데라토, 안단테) are not in TEMPO_WORDS yet; tempo vocabulary is not part of this change")
 @pytest.mark.parametrize("text,lo,hi", [("신나는 아다지오", 55, 80), ("슬픈 알레그로", 110, 140), ("슬픈 모데라토", 90, 110), ("신나는 안단테", 70, 100)])
 def test_italian_tempo_terms_in_korean_script(text, lo, hi):
     assert lo <= RULE.generate_spec(text)["tempo_bpm"] <= hi
 
 
-@pytest.mark.xfail(strict=True, reason="'느릿느릿', '천천히' style adverbs are not in TEMPO_WORDS")
 def test_other_slow_words():
+    """천천히 (slowly) is now a tempo word."""
     assert RULE.generate_spec("신나는 천천히 연주")["tempo_bpm"] <= 76
 
 
-# ---------------- genre (NOT fixed: xfail until the Intent v1 genre enum is agreed) ----------------
+# ---------------- genre (extracted into Intent.genre, applied by the genre presets) ----------------
 
-GENRE_XFAIL = "genre words only matter when a drum track is already requested (drum word or high-energy mood); genre vocabulary waits for the Intent v1 genre enum"
-
-
-@pytest.mark.xfail(strict=True, reason=GENRE_XFAIL)
 @pytest.mark.parametrize("text,style", [
     ("비 오는 날 창가에서 듣는 재즈", "shuffle"), ("재즈", "shuffle"), ("잔잔한 재즈 피아노", "shuffle"),
     ("록 음악", "rock_basic"), ("잔잔한 발라드", "half_time"), ("보사노바 기타", "bossa"), ("a quiet jazz piece", "shuffle"),
@@ -193,7 +187,7 @@ def test_genre_is_reflected_when_drums_are_requested(text, style):
     assert drum_style(text) == style
 
 
-@pytest.mark.xfail(strict=True, reason="'왈츠'/'waltz' implies 3/4 but meter-from-genre inference is not implemented (genre vocabulary pending)")
+@pytest.mark.xfail(strict=True, reason="'왈츠'/'waltz' implies 3/4, but a meter inferred from a genre word is a musical decision (expander territory) and waltz is not in the agreed genre enum; docs/rule-provider.md section 6")
 def test_waltz_implies_three_four():
     assert RULE.generate_spec("우아한 왈츠")["time_signature"] == [3, 4]
 

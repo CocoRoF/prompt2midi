@@ -354,3 +354,61 @@ def test_the_docs_list_every_genre_mood_and_the_listening_caveat():
     assert "청취" in text and "확인하지 않았" in text
     for rule_word in ("melody", "chords", "pad", "bass", "drums"):
         assert rule_word in text
+
+
+# ---------------- instruments_mode="fill" (used by the RuleProvider) ----------------
+
+def F(**kw):
+    return expand(I(**kw), instruments_mode="fill")
+
+
+def test_the_default_mode_is_unchanged_ensemble_and_unknown_modes_are_rejected():
+    assert expand(I(instruments=["piano"])).spec == expand(I(instruments=["piano"]), instruments_mode="ensemble").spec
+    assert roles_of(expand(I(instruments=["piano"])).spec) == {"melody": "piano"}
+    with pytest.raises(ValueError):
+        expand(I(), instruments_mode="union")
+
+
+def test_fill_keeps_named_instruments_and_fills_the_other_roles():
+    assert roles_of(F(instruments=["piano"]).spec) == {"melody": "piano", "chords": "electric_piano"}, "ensemble mode would drop the chords"
+    assert roles_of(F(instruments=["flute"], mood=["energetic"]).spec) == {"melody": "flute", "bass": "electric_bass", "drums": "rock_basic"}
+    assert roles_of(F(instruments=["flute"], mood=["sad"]).spec) == {"melody": "flute", "chords": "piano"}
+    assert roles_of(F(instruments=["flute", "drums"], mood=["sad"]).spec) == {"melody": "flute", "chords": "piano", "bass": "electric_bass", "drums": "half_time"}
+    assert roles_of(F().spec) == {"melody": "piano", "chords": "electric_piano"}
+
+
+def test_fill_follows_the_old_rule_set_for_roles():
+    # chords only if no pad and energy < 0.7; bass if drums or energy >= 0.4; drums if named, from the genre, or (no genre) energy >= 0.7
+    assert "chords" not in roles_of(F(mood=["energetic"]).spec) and "chords" in roles_of(F(mood=["sad"]).spec)
+    assert "chords" not in roles_of(F(mood=["happy"]).spec) and "drums" in roles_of(F(mood=["happy"]).spec)
+    assert "bass" in roles_of(F(mood=["dark"]).spec) and "bass" not in roles_of(F(mood=["calm"]).spec)
+    assert roles_of(F(mood=["meditative"]).spec) == {"melody": "piano", "pad": "synth_pad"}
+    assert roles_of(F(genre=["classical"], mood=["energetic"]).spec).get("drums") is None
+
+
+def test_fill_role_assignment_matches_the_old_rule():
+    from prompt2midi.expander.presets import assign_instruments_fill as A
+    assert A(["organ", "sax"])[0] == {"melody": "sax", "chords": "organ"}, "an organ never leads"
+    assert A(["organ"])[0] == {"chords": "organ"}
+    assert A(["flute", "organ", "piano", "synth_lead"])[0] == {"melody": "flute", "chords": "organ"}
+    assert A(["piano", "violin"])[0] == {"melody": "piano", "chords": "violin"}
+    assert A(["piano", "strings"])[0] == {"melody": "piano", "pad": "strings"}, "strings are the pad, never chords"
+    assert A(["strings", "trumpet"])[0] == {"melody": "strings", "pad": "strings"}, "the old rule's strings lead and pad"
+    assert A(["synth_pad", "flute"])[0] == {"melody": "flute", "pad": "synth_pad"}
+    assert A(["strings", "synth_pad"])[0]["pad"] == "strings"
+    r, drums, ignored = A(["flute", "trumpet", "electric_bass", "synth_bass", "drums"])
+    assert r == {"melody": "flute", "bass": "electric_bass"} and drums is True and [i for i, _ in ignored] == ["trumpet", "synth_bass"]
+
+
+def test_fill_mode_expansions_are_valid_for_every_mood_genre_instrument():
+    for mood, genre in itertools.product(ALL_MOODS, ALL_GENRES):
+        ok(F(mood=[mood], genre=[genre]))
+    for ins in ALL_INSTRUMENTS:
+        ok(F(instruments=[ins]))
+    for a, b in itertools.combinations(["piano", "violin", "flute", "organ", "strings", "synth_pad", "electric_bass", "drums", "sax"], 2):
+        ok(F(instruments=[a, b], mood=["epic"]))
+
+
+def test_fill_mode_is_deterministic():
+    a = F(instruments=["flute", "organ"], mood=["happy"], genre=["jazz"])
+    assert a.spec == F(instruments=["flute", "organ"], mood=["happy"], genre=["jazz"]).spec

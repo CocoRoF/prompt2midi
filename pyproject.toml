@@ -17,6 +17,9 @@ dev = ["pytest", "httpx"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"prompt2midi.translate" = ["lexicon/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]

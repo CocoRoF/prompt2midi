@@ -90,6 +90,12 @@
   예: `[piano, strings]` → melody piano, chords strings / `[strings, piano]` → melody strings, chords piano / `[flute, trumpet, sax]` → melody flute(나머지 무시) / `[organ, piano, strings]` → melody organ, chords piano, pad strings.
 - **기본값(목록 없음)**: 장르 악기 → melody 기본 piano; pad 는 무드가 meditative·epic 이면 synth_pad; chords 는 pad 가 없을 때 electric_piano(멜로디가 piano 일 때) 또는 piano; bass 는 드럼이 있거나 에너지 ≥ 0.4 이면 electric_bass; 드럼은 장르가 정하거나(classical 은 없음), 장르가 없으면 에너지 ≥ 0.7. 드럼 스타일은 장르 → 에너지(< 0.35 half_time, 그 외 rock_basic).
 
+## 5.1 `instruments_mode="fill"` (RuleProvider 용)
+`expand(intent, instruments_mode="fill")` 은 명시한 악기를 **앙상블 전체가 아니라 자기 역할에만** 쓰고, 나머지 역할은 장르·무드·기본값으로 채운다. 기본값(`"ensemble"`)과 위 5절은 그대로다. 왜 필요한가: 앙상블 의미로는 "calm piano piece" 가 코드 트랙 없는 피아노 한 대가 되어 버려 기존 RuleProvider 의 출력(피아노 + 전자 피아노 코드)이 크게 달라진다.
+- 배치(`assign_instruments_fill`, 옛 RuleProvider 와 같은 결과를 내도록): melody = 나열된 것 중 처음 melody 가 가능한 악기(**오르간은 melody 가 되지 못함**), chords = 남은 것 중 처음 chords 에 맞는 악기(오르간 가능, `strings` 는 제외), pad = `strings` 가 있으면 strings(멜로디를 겸해도 pad 도 맡음 — 옛 규칙의 동작), 없으면 `synth_pad`, bass = 처음 베이스 악기, drums = `drums` 가 있으면.
+- 채움: 장르 악기 → melody 기본 piano → pad(무드 meditative/epic 이면 synth_pad) → chords(pad 가 없고 에너지 < 0.7 일 때 electric_piano, 멜로디가 piano 가 아니면 piano) → drums(나열했거나 장르가 드럼을 가짐, 장르가 없으면 에너지 ≥ 0.7) → bass(드럼이 있거나 에너지 ≥ 0.4 이면 electric_bass).
+- 결정성·유효성은 ensemble 과 같은 시험으로 확인(무드 × 장르 100 조합, 악기 18종, 악기 쌍).
+
 ## 6. 보장하는 것과 못 하는 것
 - 생성된 MusicSpec 은 `validate_spec`·`compile_spec`·`check_midi`(이슈 0건)를 통과한다. 시험: 무드 10 × 장르 10 조합 전부, 무드 단독·장르 단독, 악기 18종 단독 앙상블, 좁은 음역 악기 8종 × 조성 17 × 모드 7, 박자표 6 × 템포 40/200 × 마디 1/64, null 투성이·꽉 찬 Intent.
 - 멜로디 악기의 음역에 모티프가 안 맞는 키에서는 좁은 `arch_slow` 모티프로 바꾼다(explain 에 기록).

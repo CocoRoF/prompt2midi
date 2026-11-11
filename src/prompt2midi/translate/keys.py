@@ -12,7 +12,7 @@ from ..spec import MODE_INTERVALS, PITCH_CLASS, TIME_SIGNATURES
 MODE_WORDS = tuple(MODE_INTERVALS)  # major minor dorian mixolydian lydian phrygian harmonic_minor
 
 _KEY_RE = re.compile(r"\b([A-G])(?:[- ]?(sharp|flat)|([#b]))?[- ]?(major|minor|dorian|mixolydian|lydian|phrygian|harmonic minor)\b")
-_SIG_RE = re.compile(r"\b([2-7])\s*/\s*([48])\b")
+_SIG_RE = re.compile(r"(?<![0-9A-Za-z])([2-7])\s*/\s*([48])(?![0-9A-Za-z])")  # not \b: Korean letters are word chars, so "6/8박자" has no boundary
 _BPM_RE = re.compile(r"(\d{2,3})\s*(?:bpm|BPM|Bpm|비피엠)")
 
 # ----- Korean key / meter parsing -----

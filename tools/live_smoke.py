@@ -1,4 +1,4 @@
-"""Start the real server with uvicorn on a free port and walk through the keyless flow over HTTP.
+"""Start the real server (python -m prompt2midi.api, uvicorn with proxy_headers=False) on a free port and walk through the keyless flow over HTTP.
 
     python tools/live_smoke.py            # prints what happened; exit code 0 = all checks passed
 
@@ -33,7 +33,7 @@ def main() -> int:
     for k in ("P2M_SECRET_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         env.pop(k, None)
     log = open(os.path.join(tmp, "server.log"), "w+")
-    proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "prompt2midi.api.app:app", "--host", "127.0.0.1", "--port", str(port)], env=env, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT)
+    proc = subprocess.Popen([sys.executable, "-m", "prompt2midi.api", "--host", "127.0.0.1", "--port", str(port)], env=env, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT)
     base = f"http://127.0.0.1:{port}"
     ok = True
     jar = http.cookiejar.CookieJar()

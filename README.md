@@ -47,12 +47,13 @@ print(r.provider_used, r.seed, [w.message for w in r.warnings])
 비밀 스캔 오탐(시험용 가짜 키 등)은 해당 줄 끝에 `# pragma: allowlist secret` 주석을 달아 제외한다.
 
 ## 서버 실행 (웹 API + 화면)
-### 로컬 (uvicorn)
+### 로컬
 ```bash
 pip install -e ".[dev]"
-P2M_DATA_DIR=./instance uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000 --no-proxy-headers
+python -m prompt2midi.api --host 127.0.0.1 --port 8000 --data-dir ./instance     # 옵션은 모두 선택(기본값 127.0.0.1, 8000, $P2M_DATA_DIR 또는 ./instance)
 ```
-- **`--no-proxy-headers` 를 꼭 붙인다.** uvicorn 기본값은 127.0.0.1 에서 온 `X-Forwarded-For` 를 믿고 클라이언트 주소를 바꾸므로, 붙이지 않으면 헤더 하나로 관리자 로그인 실패 제한(IP 당 5회)을 우회할 수 있다(구본우 확인: 헤더를 바꿔 가며 7번 시도해도 모두 401). 프록시 뒤에서의 설정은 아래 '운영 권고'.
+- **이 진입점을 쓴다.** 내부에서 uvicorn 을 `proxy_headers=False` 로 띄운다. uvicorn 기본값(`--proxy-headers`)은 127.0.0.1 에서 온 `X-Forwarded-For` 를 믿고 클라이언트 주소를 바꾸므로, 그대로 두면 헤더 하나로 관리자 로그인 실패 제한(IP 당 5회)을 우회할 수 있다(구본우 확인: 헤더를 바꿔 가며 7번 시도해도 모두 401). 프록시 뒤에서의 설정은 아래 '운영 권고'.
+- `uvicorn prompt2midi.api.app:app` 을 직접 실행해도 되지만 그때는 **`--no-proxy-headers` 가 필수**다: `P2M_DATA_DIR=./instance uvicorn prompt2midi.api.app:app --host 127.0.0.1 --port 8000 --no-proxy-headers`. 빼먹으면 앱이 (가능한 범위에서) 경고 로그를 남기지만 막지는 못한다.
 - 키 없이도 `http://127.0.0.1:8000/` 에서 규칙 공급자로 "문장 → MIDI 다운로드"가 된다. 관리자 화면은 `/admin`.
 - 데이터 디렉터리 `P2M_DATA_DIR`(기본 `./instance`, git 에서 제외됨)에 `admin.json`·`settings.json`·`secrets.json`·`usage.json` 이 0600 으로 저장된다.
 - 화면 폴더는 `P2M_WEB_DIR` 이 없으면 저장소의 `web/`, 없으면 현재 디렉터리의 `web/` 를 찾는다.
@@ -87,6 +88,6 @@ Docker: `docker stop prompt2midi && docker run --rm -v p2m-data:/data busybox rm
 ### 운영 권고
 - **HTTPS 뒤에서 운영한다.** 관리자 비밀번호와 API 키가 평문 HTTP 로 오가면 안 된다. nginx·Caddy 같은 리버스 프록시나 로드밸런서에서 TLS 를 종단하고 컨테이너 포트(8000)는 외부에 직접 열지 않는다. 세션 쿠키의 `Secure` 는 HTTPS 일 때만 붙는다(프록시 뒤라면 `P2M_TRUST_PROXY=1` 이어야 `X-Forwarded-Proto` 를 본다).
 - **프록시 뒤에서는 `P2M_TRUST_PROXY=1`**: 속도 제한·로그인 실패 제한이 클라이언트 IP 를 `X-Forwarded-For` 의 **마지막** 항목으로 센다. 프록시 뒤에서만 켠다 — 꺼 두면 헤더는 무시되어 헤더로 제한을 우회할 수 없다(계약 `docs/api-and-admin.md` 9절).
-- **uvicorn 의 `--no-proxy-headers` 를 함께 쓴다.** uvicorn 은 기본으로 127.0.0.1 에서 온 `X-Forwarded-*` 를 믿고 클라이언트 주소를 바꾼다. 그러면 `P2M_TRUST_PROXY` 를 켜지 않았어도 같은 호스트의 프록시가 전달한 헤더로 IP 가 바뀌어, 앱이 헤더 처리를 직접 하는 위 규칙과 어긋난다. Docker 이미지는 이 옵션을 이미 준다. 직접 실행할 때는 `uvicorn … --no-proxy-headers` 로 한다.
+- **uvicorn 의 proxy 헤더 처리는 끈다(`python -m prompt2midi.api` 가 자동으로, `uvicorn` 직접 실행이면 `--no-proxy-headers`).** uvicorn 은 기본으로 127.0.0.1 에서 온 `X-Forwarded-*` 를 믿고 클라이언트 주소를 바꾼다. 그러면 `P2M_TRUST_PROXY` 를 켜지 않았어도 같은 호스트의 프록시가 전달한 헤더로 IP 가 바뀌어, 앱이 헤더 처리를 직접 하는 위 규칙과 어긋난다. Docker 이미지는 `python -m prompt2midi.api` 로 시작한다. 직접 `uvicorn` 을 쓰면 `--no-proxy-headers` 를 붙인다.
 - `/data` 를 백업하고 접근 권한을 제한한다(키가 들어 있다).
 - 환경변수와 구현 세부: [`docs/api-and-admin.md`](docs/api-and-admin.md) 9절.

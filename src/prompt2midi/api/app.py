@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import secrets
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -38,6 +40,7 @@ class State:
     login_fail: SlidingWindow  # failed admin logins/setups per IP
     setup_token: str | None
     setup_announced: bool = False
+    proxy_warned: bool = False
     adapters: dict | None = None  # tests: {provider_id: fake SDK adapter}
 
     def today(self) -> str:
@@ -46,6 +49,21 @@ class State:
     def scrub(self, text: str) -> str:
         """Last line of defence: remove any stored API key (or a fragment of one) from outgoing text."""
         return mask_secrets(text, list(self.store.keys().values()))
+
+
+def uvicorn_cli_without_no_proxy_headers(argv: list[str]) -> bool:
+    """Best effort: True when this process looks like `uvicorn ...` / `python -m uvicorn ...` started
+    without `--no-proxy-headers` (uvicorn then rewrites the client address from X-Forwarded-For)."""
+    if not argv:
+        return False
+    first = os.path.basename(argv[0])
+    started_by_uvicorn = first in ("uvicorn", "uvicorn.exe") or (first == "__main__.py" and os.path.basename(os.path.dirname(argv[0])) == "uvicorn")
+    return started_by_uvicorn and "--no-proxy-headers" not in argv
+
+
+PROXY_WARNING = ("uvicorn's proxy-header handling seems to be ON: the client address was taken from X-Forwarded-For although "
+                 "P2M_TRUST_PROXY is not set. A forged header can then get around the per-IP limits. Start the server with "
+                 "`python -m prompt2midi.api` or add `--no-proxy-headers` to uvicorn.")
 
 
 def create_app(cfg: AppSettings | None = None, adapters: dict | None = None) -> FastAPI:
@@ -62,6 +80,9 @@ def create_app(cfg: AppSettings | None = None, adapters: dict | None = None) -> 
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
+        if not cfg.trust_proxy and uvicorn_cli_without_no_proxy_headers(sys.argv) and not state.proxy_warned:
+            state.proxy_warned = True
+            log.warning("started through the uvicorn CLI without --no-proxy-headers: %s", PROXY_WARNING)
         if state.setup_token and not state.setup_announced:
             state.setup_announced = True
             print(f"[prompt2midi] 관리자 최초 설정 토큰(1회용, 이 줄은 한 번만 출력됩니다): {state.setup_token}", flush=True)
@@ -75,6 +96,12 @@ def create_app(cfg: AppSettings | None = None, adapters: dict | None = None) -> 
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        if not cfg.trust_proxy and not state.proxy_warned:
+            xff = request.headers.get("x-forwarded-for")
+            # uvicorn's proxy middleware (on by default) replaces scope["client"] with an X-Forwarded-For entry
+            if xff and request.client and request.client.host in [p.strip() for p in xff.split(",")]:
+                state.proxy_warned = True
+                log.warning(PROXY_WARNING)
         resp = await call_next(request)
         h = resp.headers
         h.setdefault("X-Content-Type-Options", "nosniff")

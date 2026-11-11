@@ -29,5 +29,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"]
 
-# --no-proxy-headers: 클라이언트 IP 처리는 앱의 P2M_TRUST_PROXY 규칙으로만 한다(README 운영 권고).
-CMD ["uvicorn", "prompt2midi.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
+# 진입점이 uvicorn 을 proxy_headers=False 로 띄운다: 클라이언트 IP 처리는 앱의 P2M_TRUST_PROXY 규칙으로만 한다(README 운영 권고).
+CMD ["python", "-m", "prompt2midi.api", "--host", "0.0.0.0", "--port", "8000"]

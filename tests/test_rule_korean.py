@@ -211,3 +211,59 @@ def test_korean_prompts_always_give_a_valid_compilable_spec(text):
 def test_korean_key_and_meter_are_deterministic():
     a = compile_spec(spec_of("슬프고 어두운 현악 앙상블, A단조"))
     assert a == compile_spec(spec_of("슬프고 어두운 현악 앙상블, A단조"))
+
+
+# ---------------- false positives: words that merely contain a note name + 장조/단조 ----------------
+
+WRONG_READING = {
+    "사장조직 회의 음악": "G major", "마장조선시대 음악": "E major", "나 장조림 요리 노래": "B major", "가 장조 심": "A major", "바 단조건": "F minor",
+}
+
+
+@pytest.mark.parametrize("text,wrong", list(WRONG_READING.items()), ids=list(WRONG_READING))
+def test_reported_false_positives_are_no_longer_keys(text, wrong):
+    from prompt2midi.providers.rule import find_key
+    assert find_key(text) is None, text
+    assert RULE.explain(text)["key"] != wrong, text
+    spec_of(text)
+
+
+@pytest.mark.parametrize("text", [
+    "다장조림", "라단조건물", "가단조건", "마장조선", "사단조직", "바장조림 요리", "나단조건 없이", "다 단조건", "가 장조림", "라 장조 심사",
+    "마 단조 건물", "a 단조 곡", "라 단조 피아노", "나 장조 요리",
+])
+def test_more_words_containing_a_note_name_and_a_mode_are_not_keys(text):
+    from prompt2midi.providers.rule import find_key
+    assert find_key(text) is None, text
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("C장조에서", ("C", "major")), ("A단조로", ("A", "minor")), ("라단조 피아노", ("D", "minor")), ("C장조의 밝은 피아노 곡", ("C", "major")),
+    ("C장조는 밝다", ("C", "major")), ("A단조를 쓴 곡", ("A", "minor")), ("A단조곡", ("A", "minor")), ("마장조풍의 노래", ("E", "major")),
+    ("D장조처럼 밝게", ("D", "major")), ("G장조와 E단조", ("G", "major")), ("C장조입니다", ("C", "major")), ("F장조도 좋다", ("F", "major")),
+    ("A단조에서는", ("A", "minor")), ("C장조으로", ("C", "major")), ("바단조로서", ("F", "minor")), ("A단조 스타일", ("A", "minor")),
+    ("올림바단조 록", ("F#", "minor")), ("내림 나 장조", ("Bb", "major")), ("A 단조", ("A", "minor")), ("D 도리안", ("D", "dorian")), ("라 도리안", ("D", "dorian")),
+    ("다장조.", ("C", "major")), ("다장조,", ("C", "major")), ("(라단조)", ("D", "minor")), ("곡: 사장조", ("G", "major")),
+], ids=str)
+def test_legitimate_forms_still_work(text, expected):
+    from prompt2midi.providers.rule import find_key
+    assert find_key(text) == expected
+
+
+def test_a_real_key_inside_a_sentence_is_found_and_a_lookalike_before_it_is_skipped():
+    from prompt2midi.providers.rule import find_key
+    assert find_key("사장조직 회의 음악이지만 곡은 A단조") == ("A", "minor")
+    assert find_key("마장조선시대 이야기, 라단조 피아노") == ("D", "minor")
+
+
+def test_false_positive_does_not_change_the_mood_driven_result():
+    plain = RULE.generate_spec("회의 음악")
+    for text in ("사장조직 회의 음악", "바 단조건 회의 음악"):
+        d = RULE.generate_spec(text)
+        assert d["key"] == plain["key"] and d["tempo_bpm"] == plain["tempo_bpm"], text
+
+
+def test_known_limitation_adjacent_note_name_and_mode_followed_by_a_space_is_a_key():
+    """'사장조 직원' (president + staff) is indistinguishable from '라단조 피아노' without a dictionary: it is read as G major."""
+    from prompt2midi.providers.rule import find_key
+    assert find_key("사장조 직원") == ("G", "major")

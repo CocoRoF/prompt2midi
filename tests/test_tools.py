@@ -72,3 +72,13 @@ def test_ci_status_renders_snapshot():
     md = ci_status.render("o/r", "abc123", data, "2026-01-01 00:00")
     assert "abc123" in md and "스냅샷" in md and "자동으로 갱신되지 않는" in md
     assert "| docker | in_progress | - |" in md and "| test (3.12) | completed | success |" in md
+
+
+def test_license_check_includes_ci_only_requirements(tmp_path):
+    _repo(tmp_path, {
+        "pyproject.toml": '[project]\nname="x"\ndependencies=["mido>=1"]\n',
+        "tools/requirements-ci.txt": "# 주석\nplaywright==1.65.0  # CI 전용\n",
+        "data/sources.csv": "name,type\nmido 1.3.3,python dependency (runtime)\n",
+    })
+    r = _run(tmp_path, "check_licenses.py")
+    assert r.returncode == 1 and "playwright" in r.stdout

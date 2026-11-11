@@ -3,6 +3,7 @@
 This is stage 3 of the haru roadmap (docs/음악생성분석/03 §3): a sentence -> {tempo, key, mood, instruments}
 rule table. It is deliberately simple and deterministic: the same prompt always gives the same dict.
 Everything it decides can be inspected with `RuleProvider.explain(prompt)`.
+Key / meter / tempo / genre rules and their priority: docs/rule-provider.md.
 """
 from __future__ import annotations
 
@@ -94,6 +95,83 @@ _KEY_RE = re.compile(r"\b([A-G])(?:[- ]?(sharp|flat)|([#b]))?[- ]?(major|minor|d
 _SIG_RE = re.compile(r"\b([2-7])\s*/\s*([48])\b")
 _BPM_RE = re.compile(r"(\d{2,3})\s*(?:bpm|BPM|Bpm|비피엠)")
 
+# ----- Korean key / meter parsing -----
+# Priority for the key (documented in docs/rule-provider.md):
+#   1. an explicit key in the prompt (tonic + mode, English "A minor" or Korean "A단조"/"내림나장조"); if several, the first one
+#   2. an explicit mode word without a tonic ("도리안", "dorian", bare "단조"/"장조") -> that mode on the mode's default tonic
+#   3. otherwise the mode preferred by the mood word, on that mode's default tonic
+# An explicit key never changes the mood-driven energy/tempo/motif, only tonic and mode.
+KO_LETTERS = {"가": "A", "나": "B", "다": "C", "라": "D", "마": "E", "바": "F", "사": "G"}
+KO_MODES = {"장조": "major", "단조": "minor", "믹솔리디안": "mixolydian", "리디안": "lydian", "도리안": "dorian", "프리지안": "phrygian",
+            "화성단조": "harmonic_minor", "하모닉마이너": "harmonic_minor", "하모닉 마이너": "harmonic_minor"}
+_KO_MODE_ALT = "|".join(sorted((re.escape(k) for k in KO_MODES), key=len, reverse=True))
+_KO_KEY_RE = re.compile(
+    r"(?<![가-힣A-Za-z])(?:(올림|내림)\s*)?([가나다라마바사]|[A-Ga-g])(?:\s*(샵|플랫)|([#b]))?\s*(" + _KO_MODE_ALT + r")(?!롭|로운|로워|로움)"
+)
+_BARE_KO_MODE_RE = re.compile(r"(?<![가-힣])(" + _KO_MODE_ALT + r")(?!롭|로운|로워|로움)")
+_KO_NUM = {**{str(i): i for i in range(10)}, "이": 2, "삼": 3, "사": 4, "오": 5, "육": 6, "칠": 7, "팔": 8, "구": 9}
+_KO_SIG_RE = re.compile(r"([0-9]|[이삼사오육칠팔구])\s*분의\s*([0-9]|[이삼사오육칠팔구])\s*박자?")
+_KO_BEATS_RE = re.compile(r"(?<![0-9/])([2-5]|[이삼사오])\s*박자")
+_BEATS_TO_SIG = {2: (2, 4), 3: (3, 4), 4: (4, 4), 5: (5, 4)}
+
+
+def find_key(text: str) -> tuple[str, str] | None:
+    """First explicit key in the text (English or Korean) as (tonic, mode), or None."""
+    found: list[tuple[int, str, str]] = []
+    m = _KEY_RE.search(text)
+    if m:
+        letter, word, sym, mword = m.groups()
+        acc = "#" if (word == "sharp" or sym == "#") else "b" if (word == "flat" or sym == "b") else ""
+        if letter + acc in PITCH_CLASS:
+            found.append((m.start(), letter + acc, mword.replace(" ", "_")))
+    for k in _KO_KEY_RE.finditer(text):
+        prefix, letter, suffix, sym, mode_ko = k.groups()
+        letter = KO_LETTERS.get(letter, letter.upper())
+        acc = ""
+        for mark in (prefix, suffix):
+            if mark in ("올림", "샵"):
+                acc = "#"
+            elif mark in ("내림", "플랫"):
+                acc = "b"
+        if sym in ("#", "b") and not acc:
+            acc = sym
+        if letter + acc in PITCH_CLASS:  # e.g. 내림다장조 (Cb) does not exist in our spelling: skipped
+            found.append((k.start(), letter + acc, KO_MODES[mode_ko.replace(" ", "")]))
+            break
+    if not found:
+        return None
+    _pos, tonic, mode = min(found)
+    return tonic, mode
+
+
+def find_mode_word(low: str, text: str) -> str | None:
+    """A mode named without a tonic (English or Korean); None when absent."""
+    mw = next((w for w in MODE_WORDS if w.replace("_", " ") in low), None)
+    if mw:
+        return mw
+    bare = _BARE_KO_MODE_RE.search(text)
+    return KO_MODES[bare.group(1)] if bare else None
+
+
+def find_time_signature(text: str) -> tuple[int, int] | None:
+    """Explicit meter: 3/4, 6/8, 4분의 3박자 (= 3/4), 사분의 삼박자, 3박자 (= 3/4). Only values in TIME_SIGNATURES count."""
+    cands: list[tuple[int, tuple[int, int]]] = []
+    m = _SIG_RE.search(text)
+    if m:
+        cands.append((m.start(), (int(m.group(1)), int(m.group(2)))))
+    k = _KO_SIG_RE.search(text)
+    if k:
+        den, num = _KO_NUM[k.group(1)], _KO_NUM[k.group(2)]  # "N분의 M박자": M beats of 1/N notes
+        cands.append((k.start(), (num, den)))
+    b = _KO_BEATS_RE.search(text)
+    if b and not k:
+        cands.append((b.start(), _BEATS_TO_SIG[_KO_NUM[b.group(1)]]))
+    for _pos, sig in sorted(cands):
+        if sig in TIME_SIGNATURES:
+            return sig
+    return None
+
+
 MAX_PROMPT_CHARS = 2000
 
 
@@ -151,28 +229,22 @@ class RuleProvider:
         _words, energy, mode_pref, bpm_default, motif_key = MOODS[mood]
 
         # key
-        tonic, mode = None, None
-        m = _KEY_RE.search(text)
-        if m:
-            letter, word, sym, mword = m.groups()
-            acc = "#" if (word == "sharp" or sym == "#") else "b" if (word == "flat" or sym == "b") else ""
-            cand = letter + acc
-            if cand in PITCH_CLASS:
-                tonic, mode = cand, mword.replace(" ", "_")
-        if tonic is None:
-            # a mode word alone ("a dorian feel") keeps the default tonic of that mode
-            mw = next((w for w in MODE_WORDS if w.replace("_", " ") in low), None)
+        explicit = find_key(text)
+        if explicit:
+            tonic, mode = explicit
+        else:
+            mw = find_mode_word(low, text)
             mode = mw or mode_pref
             tonic = DEFAULT_TONIC[mode]
             why["defaults"].append(f"key={tonic} {mode} ({'mode word' if mw else 'from mood'})")
         why["key"] = f"{tonic} {mode}"
 
         # time signature
-        sig = [4, 4]
-        ms = _SIG_RE.search(text)
-        if ms and (int(ms.group(1)), int(ms.group(2))) in TIME_SIGNATURES:
-            sig = [int(ms.group(1)), int(ms.group(2))]
+        explicit_sig = find_time_signature(text)
+        if explicit_sig:
+            sig = list(explicit_sig)
         else:
+            sig = [4, 4]
             why["defaults"].append("time_signature=4/4")
         why["time_signature"] = sig
 

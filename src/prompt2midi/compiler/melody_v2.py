@@ -131,7 +131,8 @@ def _cadence_pitch(info: _ChordInfo, cur: int, prev: int | None, complete: bool,
 
     Complete cadence (the last section), first match wins: the key's tonic if it is a chord tone; else the key's
     third, then fifth if one is; else the chord's root. `key_pcs` = (tonic, third, fifth) pitch classes of the key.
-    Half cadence (earlier sections): the chord's fifth, else its third, else any non-root chord tone."""
+    Half cadence (earlier sections): a chord tone that is also a tone of the key's triad (the 5th of the key on a V chord),
+    else the chord's fifth, else its third, else any non-root chord tone."""
     def nearest(pcs: list[int]) -> int | None:
         c = [p for p in range(lo, hi + 1) if p % 12 in pcs]
         return min(c, key=lambda p: (abs(p - cur), abs(p - prev) if prev is not None else 0, -p)) if c else None
@@ -146,7 +147,8 @@ def _cadence_pitch(info: _ChordInfo, cur: int, prev: int | None, complete: bool,
             if got is not None:
                 return got
         return cur
-    pick = nearest([info.fifth] if info.fifth is not None else []) or nearest(
+    stable = [x for x in key_pcs if x in info.tones] if key_pcs is not None else []   # a chord tone that is also a tone of the key's triad
+    pick = (nearest(stable) if stable else None) or nearest([info.fifth] if info.fifth is not None else []) or nearest(
         [x for x in (info.third,) if x is not None]) or nearest(sorted(info.tones - {info.root}))
     return pick if pick is not None else cur
 
@@ -298,13 +300,17 @@ def build_melody(
     strong_pos = {k * (ppq // 2) for k in kicks}
 
     n = len(line)
+    # chord tones inside the key are preferred: a chord tone outside the scale (the 7th of E7 in E major) is not a melody target
+    # unless the chord has no tone inside the key (then the chord tones are used as they are)
+    in_key = frozenset((base + iv[i]) % 12 for i in range(7))
     tones = [chord_tones(slots[slot_of(e.t)][2]) for e in line]
+    tones = [t & in_key or t for t in tones]
     strong = [e.t % bar in strong_pos or e.t == starts[slot_of(e.t)] for e in line]
     final = list(pitches)
 
     def _want(j: int) -> int:
         return (pitches[j] > pitches[j - 1]) - (pitches[j] < pitches[j - 1]) if j else 0
-    scale_pcs = {(base + iv[i]) % 12 for i in range(7)}
+    scale_pcs = in_key
     key_triad = (base % 12, (base + iv[2]) % 12, (base + iv[4]) % 12)   # tonic, third, fifth of the key
     last_sec = len(spec.sections) - 1
     phrase_last = {j for j in range(n) if j + 1 == n or line[j + 1].phrase != line[j].phrase}

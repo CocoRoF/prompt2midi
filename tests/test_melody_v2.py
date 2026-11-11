@@ -14,6 +14,7 @@ import pytest
 from prompt2midi import spec as S
 from prompt2midi.compiler import PPQ, compile_spec
 from prompt2midi.compiler import melody_v2 as M
+from prompt2midi.compiler.harmony_v2 import playing_slots
 from prompt2midi.compiler.render import _slots, _ticks
 from prompt2midi.music import effective_register
 from prompt2midi.providers import RuleProvider
@@ -50,11 +51,16 @@ def _notes(midi: bytes):
     return {c: sorted(v) for c, v in out.items()}
 
 
+def _slots_v2(spec):
+    """The slot list v2 plays (substituted / cadential chords), as compile_spec builds it."""
+    return playing_slots(spec, list(_slots(spec)), effective_seed(spec))
+
+
 def _melody(spec):
     tr = next((t for t in spec.tracks if t.role is Role.melody), None)
     if tr is None:
         return None, None
-    got = M.build_melody(spec, tr, effective_seed(spec), list(_slots(spec)), _ticks(beats_per_bar(spec)), PPQ, lambda e, r: 80)
+    got = M.build_melody(spec, tr, effective_seed(spec), _slots_v2(spec), _ticks(beats_per_bar(spec)), PPQ, lambda e, r: 80)
     return tr, got
 
 
@@ -71,8 +77,8 @@ def test_v1_and_none_unchanged_and_only_melody_differs(specs):
         v1, v2 = compile_spec(sp), compile_spec(_v2(sp))
         a, b = _notes(v1), _notes(v2)
         for ch in set(a) | set(b):
-            if ch not in (0, 2, 3):   # melody (PR2/3) and chord/pad voicing (PR4) are the only roles v2 touches so far
-                assert a.get(ch) == b.get(ch), f"channel {ch} must not change in PR2-4"
+            if ch == 9:   # v2 touches melody, chords/pad and bass; the drums are never changed
+                assert a.get(ch) == b.get(ch), "the drum track must not change"
         differ += a.get(0) != b.get(0)
     assert differ >= len(specs) - 2, "v2 should change the melody of (almost) every spec"
 
@@ -102,7 +108,7 @@ def test_strong_beats_and_chord_changes_are_chord_tones(specs):
         tr, got = _melody(_v2(sp))
         if got is None:
             continue
-        slots = list(_slots(sp))
+        slots = _slots_v2(sp)
         starts = [s[0] for s in slots]
         bar = _ticks(beats_per_bar(sp))
         from prompt2midi.compiler import drums as D
@@ -118,7 +124,7 @@ def test_weak_nonchord_tones_are_passing_neighbor_or_escape(specs):
         tr, got = _melody(_v2(sp))
         if got is None:
             continue
-        slots = list(_slots(sp))
+        slots = _slots_v2(sp)
         starts = [s[0] for s in slots]
         ct = [n.pitch % 12 in M.chord_tones(slots[max(j for j, s in enumerate(starts) if s <= n.start)][2]) for n in got]
         for j, n in enumerate(got):
@@ -234,7 +240,7 @@ def test_complete_cadence_in_last_section_and_half_cadence_before(specs):
         tr, got = _melody(sp)
         if got is None or len(sp.sections) < 1:
             continue
-        slots = list(_slots(sp))
+        slots = _slots_v2(sp)
         bar = _ticks(beats_per_bar(sp))
         total = sum(sec.bars for sec in sp.sections) * bar
         pos = 0
@@ -252,8 +258,13 @@ def test_complete_cadence_in_last_section_and_half_cadence_before(specs):
                 assert last.end == total, "the final note is held to the very end of the last bar"
             else:
                 assert last.pitch % 12 in info.tones
-                if info.fifth is not None:
-                    assert last.pitch % 12 == info.fifth or last.pitch % 12 == info.third
+                tonic = S.PITCH_CLASS[sp.key.tonic.value]
+                iv = S.MODE_INTERVALS[sp.key.mode.value]
+                stable = {tonic, (tonic + iv[2]) % 12, (tonic + iv[4]) % 12} & info.tones   # chord tones that are key-triad tones
+                if stable:
+                    assert last.pitch % 12 in stable, (sp.title, chord, last.pitch)
+                elif info.fifth is not None:
+                    assert last.pitch % 12 in (info.fifth, info.third)
             pos = end
             checked += 1
     assert checked >= len(specs)
@@ -265,7 +276,7 @@ def test_every_phrase_ends_on_a_chord_tone_with_a_breath(specs):
         tr, got = _melody(sp)
         if got is None:
             continue
-        slots = list(_slots(sp))
+        slots = _slots_v2(sp)
         ends = _phrase_ends(sp)
         breath = int(M.BREATH_BEATS * PPQ)
         for k, (si, p_end) in enumerate(ends):
@@ -329,7 +340,10 @@ def test_snap_keeps_the_motifs_direction_and_avoids_leaps():
 def test_cadence_pitch_unit():
     c = M.chord_tones_info("C")
     assert (c.root, c.third, c.fifth) == (0, 4, 7)
-    assert M._cadence_pitch(c, 62, 64, False, 48, 84) == 67              # half cadence: the fifth
+    assert M._cadence_pitch(c, 62, 64, False, 48, 84) == 67              # half cadence, no key given: the chord's fifth
+    # half cadence with the key: a chord tone that is also a key-triad tone wins - on V (G B D) in C major that is G (5th of the key)
+    assert M._cadence_pitch(M.chord_tones_info("G"), 62, None, False, 48, 84, (0, 4, 7)) % 12 == 7
+    assert M._cadence_pitch(M.chord_tones_info("D"), 62, None, False, 48, 84, (0, 4, 7)) % 12 == 9   # D chord: no key-triad tone -> its fifth A
     d = M.chord_tones_info("Bdim")
     assert M._cadence_pitch(d, 62, None, False, 48, 84) % 12 in d.tones  # a chord without a perfect fifth still gives a chord tone
     # complete cadence: tonic if a chord tone; else the key's third, then fifth; else the chord root

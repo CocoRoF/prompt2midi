@@ -1,0 +1,121 @@
+{
+ "_source": "연구 1팀 참조 구현(proxy.py)의 text2midi10_결과.json 에서 곡 1·5·10 항목(M1·M2·M3·M4·M7)과 prompts.json 의 목표 조. 곡 파일은 같은 폴더의 prompt01/05/10.mid. 라벨 조를 사용한 값이다(2026-11-11, 연구 1팀).",
+ "pieces": {
+  "1": {
+   "expected": {
+    "M1": {
+     "exact_rate": 0.25,
+     "n_bars": 5,
+     "new_rate": 0.75,
+     "rep_rate": 0.25,
+     "status": "out_of_range",
+     "var_rate": 0.0
+    },
+    "M2": {
+     "huge_share": 0.2222,
+     "leap_share": 0.5556,
+     "n_pairs": 18,
+     "recovery": 0.0,
+     "repeat_share": 0.0,
+     "skip_share": 0.3889,
+     "status": "out_of_range",
+     "step_share": 0.0556
+    },
+    "M3": {
+     "n_windows": 2,
+     "reason": "유효 창 4 미만",
+     "status": "na"
+    },
+    "M4": {
+     "bass_final_tonic": 1,
+     "final_arrived": 1,
+     "final_is_tonic": 1,
+     "final_pc": 0,
+     "final_score": 1.0,
+     "section_end_stable": null,
+     "status": "in_range"
+    },
+    "M7": {
+     "off_all": 0.35,
+     "off_dur_all_tracks": 0.2183,
+     "off_strong": 0.2727,
+     "status": "out_of_range"
+    }
+   },
+   "file": "prompt01.mid",
+   "key": "C major"
+  },
+  "10": {
+   "expected": {
+    "M1": {
+     "n_bars": 2,
+     "reason": "유효 마디 4 미만",
+     "status": "na"
+    },
+    "M2": {
+     "n_pairs": 5,
+     "reason": "음정 8 미만",
+     "status": "na"
+    },
+    "M3": {
+     "n_windows": 1,
+     "reason": "유효 창 4 미만",
+     "status": "na"
+    },
+    "M4": {
+     "bass_final_tonic": 0,
+     "final_arrived": 0,
+     "final_is_tonic": 0,
+     "final_pc": 4,
+     "final_score": 0.0,
+     "section_end_stable": null,
+     "status": "out_of_range"
+    },
+    "M7": {
+     "off_all": 0.5,
+     "off_dur_all_tracks": 0.2461,
+     "off_strong": 0.0,
+     "status": "out_of_range"
+    }
+   },
+   "file": "prompt10.mid",
+   "key": "G minor"
+  },
+  "5": {
+   "expected": {
+    "M1": {
+     "n_bars": 1,
+     "reason": "유효 마디 4 미만",
+     "status": "na"
+    },
+    "M2": {
+     "n_pairs": 0,
+     "reason": "음정 8 미만",
+     "status": "na"
+    },
+    "M3": {
+     "n_windows": 0,
+     "reason": "유효 창 4 미만",
+     "status": "na"
+    },
+    "M4": {
+     "bass_final_tonic": 1,
+     "final_arrived": 0,
+     "final_is_tonic": 0,
+     "final_pc": 7,
+     "final_score": 0.0,
+     "section_end_stable": null,
+     "status": "out_of_range"
+    },
+    "M7": {
+     "off_all": 0.0,
+     "off_dur_all_tracks": 0.0244,
+     "off_strong": 0.0,
+     "status": "in_range"
+    }
+   },
+   "file": "prompt05.mid",
+   "key": "D minor"
+  }
+ }
+}

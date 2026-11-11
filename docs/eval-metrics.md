@@ -1,4 +1,4 @@
-# 평가 지표 정의 (evalkit) — 초안 v0.4
+# 평가 지표 정의 (evalkit) — 초안 v0.5
 
 - 상태: **초안. 연구 1팀 서명 대기**(연구 1팀 검토 회신 `받은 자료/연구 1팀/evalkit_지표_검토_회신.md`와 2·3차 회신[1-8 분할: 빈 트랙 축 1 유지·악기 축 3, key_match 분리, 3-8a/3-8b] 반영, 서명은 배채린 님이 임계값을 확인한 뒤). 연구 1팀 `자동채점_항목_정리.md`(26항목) **수령함**(받은 자료/연구 1팀/자동채점_항목_정리.md, 2026-11-11). 그 번호와 이 문서의 지표 이름의 대응은 7절, `results.csv` 열의 대응은 8절. 지금 지표 목록은 합의안(`docs/프롬프트투미디/2단계-계획서-합의안.md` 2절, 8절 '지표 정의 문서')의 "지금 가능" 항목에서 개발 1팀이 먼저 정리한 것이다. 항목 선정·임계값 검토는 연구 1팀, 문서화·구현은 개발 1팀.
 - 구현: `src/prompt2midi/evalkit/` · 실행: `python -m prompt2midi.evalkit <세트.json> --provider rule|fake [--out DIR] [--fallback]`
@@ -54,7 +54,7 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 ## 3. 출력
 
 `--out DIR`(기본 `out/evalkit`, `.gitignore` 대상)에 두 파일을 쓴다.
-- `results.csv`: 프롬프트별 한 줄. **열 순서: (v0.1 열 그대로) → [v0.2] `provider`, `labels`, 수치 지표의 `<지표>_value`(`tempo_match`, `scale_deviation`, `pitch_range`, `bars_match`, `bars_min`), `axis1_ok`, 별칭 `곡ID`, `언어` → [v0.3] `no_empty_tracks_value`, `midi_instruments_included_value`.** 기존 열 이름·순서는 바꾸지 않았고(시험이 고정), 새 열은 모두 끝에 붙는다. 측정 시각 열은 없다.
+- `results.csv`: 프롬프트별 한 줄. **열 순서: (v0.1 열 그대로) → [v0.2] `provider`, `labels`, 수치 지표의 `<지표>_value`(`tempo_match`, `scale_deviation`, `pitch_range`, `bars_match`, `bars_min`), `axis1_ok`, 별칭 `곡ID`, `언어` → [v0.3] `no_empty_tracks_value`, `midi_instruments_included_value` → [v0.5] `expr_*` 10개(표현력 대리 지표 값, 5절 뒤 5-1).** 기존 열 이름·순서는 바꾸지 않았고(시험이 고정), 새 열은 모두 끝에 붙는다. 측정 시각 열은 없다.
   - `provider`: 요청한 공급자. `labels`: 라벨이 있는 필드 이름(`;` 구분). `<지표>_value`: 측정한 숫자(템포는 MIDI 의 BPM, 음계 이탈·음역은 비율, 마디는 마디 수), 측정하지 않았으면 빈 칸.
   - `axis1_ok`: 생성에 성공했고 축 1 지표(`midicheck_valid`, `pitch_range`, `note_integrity`, `no_empty_tracks`, `bars_min`)가 모두 pass 또는 na. **1-8 은 분할**한다(연구 1팀 3차 회신): 빈 트랙(`no_empty_tracks`)은 파일 구조 결함이라 축 1 에 두고, 악기 구성(`midi_instruments_included`)만 축 1 에서 빼 축 3(3-7)으로 집계한다. 값은 `no_empty_tracks_value`(빈 트랙 수)·`midi_instruments_included_value`(라벨 악기 중 MIDI 에 있는 비율)에 기록한다. `deterministic` 은 하네스 속성이라 어느 축에도 넣지 않았다.
   - `곡ID`, `언어`: 연구 1팀 제안 이름의 별칭(`id`, `lang` 과 같은 값).
@@ -69,6 +69,9 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 ## 5. 확장 지점 (이번 버전에 없음)
 - **Intent v1 (문장에서 뽑은 필드의 일치율, 연구 1팀 3-1)**: Intent 스키마가 아직 없어 넣지 않았다. 들어올 자리: `evalkit/metrics.py` 의 `METRICS` 에 새 `Metric` 을 추가하고, `Context` 에 추출된 intent 를 담을 필드를 더하면 된다. `expect` 라벨은 이미 같은 이름(tonic·mode·tempo_bpm·time_signature·bars·instruments)을 쓰므로 추출 일치율과 MIDI 속성 일치율을 **따로** 보고할 수 있다(합의안 4절 위험 1).
 - 연구 1팀 26항목 중 '지금 가능' 항목: 번호 대응표를 받으면 이 표에 열을 추가한다.
+
+### 5-1. 표현력 대리 지표 (v0.5, 3단계 기준선 P0)
+`src/prompt2midi/evalkit/expressiveness.py`. 선율 반복률, 반복 리듬 마디의 변주 정도, 순차·도약 비율, 윤곽 다양성, 종지음=으뜸음, 섹션 간 밀도·음역 차, 코드 간 평균 이동 거리, 음계 이탈률. **합격 판정이 없는 값 열**(CSV 맨 끝 `expr_*`, 측정 불가는 빈 칸)이며 `axis1_ok`·집계에 들어가지 않는다. 각 함수 docstring 에 '대리하는 속성과 한계'가 있다. 정의는 보수적인 첫 버전이고 연구 1팀 정의 문서가 오면 맞춘다. 기준선 값과 해석은 `docs/baseline-expressiveness-v0.md`, 샘플 MIDI 는 `data/samples/baseline-v0/`. **이 값을 음악 품질로 보고하지 않는다.**
 
 ## 6. 서명 확인 사항 (연구 1팀 회신 2026-11-11 반영)
 

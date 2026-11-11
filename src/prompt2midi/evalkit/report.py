@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import csv
+from statistics import median
 from pathlib import Path
 
-from .expressiveness import COLUMN_PREFIX, INDICATORS
+from . import proxy as P
 from .metrics import AXIS1_METRICS, AXIS23_METRICS, DISPLAY_TITLES, EXTRACTION_METRICS, FAIL, LISTEN_COLUMNS, METRICS, NA, PASS, TEMPO_TOLERANCE_BPM, VALUE_METRICS, VALUE_METRICS_V03
 from .runner import ItemResult
 from .version import EVALKIT_VERSION
@@ -24,7 +25,7 @@ def columns() -> list[str]:
         cols += [m.name, m.name + "_reason"]
     cols += list(LISTEN_COLUMNS) + EXTRA_HEAD
     cols += [name + "_value" for name in VALUE_METRICS] + ["axis1_ok"]
-    return cols + list(ALIASES) + [name + "_value" for name in VALUE_METRICS_V03] + [COLUMN_PREFIX + i.name for i in INDICATORS]
+    return cols + list(ALIASES) + [name + "_value" for name in VALUE_METRICS_V03] + P.column_names()
 
 
 def axis1_ok(r: ItemResult) -> bool:
@@ -47,9 +48,13 @@ def rows(results: list[ItemResult]) -> list[dict]:
         for name in (*VALUE_METRICS, *VALUE_METRICS_V03):
             v = r.results[name].value
             row[name + "_value"] = "" if v is None else v
-        for i in INDICATORS:  # v0.5: expressiveness proxy values, last columns; empty when not measurable
-            v = r.expr.get(i.name)
-            row[COLUMN_PREFIX + i.name] = "" if v is None else v
+        for key, _title, _fn, names in P.PROXIES:  # v0.6: M1..M7 proxies, last columns. in_range/out_of_range/na, never pass/fail
+            res = r.proxy.get(key)
+            row[P.COLUMN_PREFIX + key] = res.status if res else P.NA
+            row[f"{P.COLUMN_PREFIX}{key}_reason"] = res.reason if res else ""
+            for n in names:
+                v = res.values.get(n) if res else None
+                row[f"{P.COLUMN_PREFIX}{key}_{n}"] = "" if v is None else v
         row["axis1_ok"] = axis1_ok(r)
         for alias, src in ALIASES.items():
             row[alias] = row[src]
@@ -124,13 +129,21 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
               "| 그룹 | 재시도가 있었던 프롬프트 | 폴백으로 만든 프롬프트 | 생성 실패 |", "|---|---|---|---|"]
     for gname, g in groups:
         lines.append(f"| {gname} | {sum(r.attempts > 1 for r in g)}/{len(g)} | {sum(r.fallback_used for r in g)}/{len(g)} | {sum(not r.generated for r in g)}/{len(g)} |")
-    lines += ["", "## 표현력 대리 지표 (값 — 합격 판정도 음악 품질도 아님)", "",
-              "구조를 재는 대리 값이다. **값이 높거나 낮은 것이 좋은 음악·나쁜 음악을 뜻하지 않는다.** 정의·한계: `src/prompt2midi/evalkit/expressiveness.py`, 해석: `docs/baseline-expressiveness-v0.md`. CSV 열은 `expr_` 로 시작한다.", "",
-              "| 지표 | 측정된 곡 수 | 평균 | 최소 | 최대 |", "|---|---|---|---|---|"]
-    for ind in INDICATORS:
-        vals = [r.expr[ind.name] for r in results if r.expr.get(ind.name) is not None]
-        stats = f"{sum(vals) / len(vals):.4f} | {min(vals):.4f} | {max(vals):.4f}" if vals else "— | — | —"
-        lines.append(f"| {ind.title} (`{COLUMN_PREFIX}{ind.name}`) | {len(vals)}/{n} | {stats} |")
+    lines += ["", "## 대리 지표 M1~M7 — 합격 판정이 아님", "",
+              "연구 1팀 정의서(`자동_대리지표_정의.md`)의 대리 지표. 판정 이름은 `in_range`/`out_of_range`/`na` 이며 **pass/fail 집계, `axis1_ok` 와 섞지 않는다.** "
+              "**범위(임계값)는 전부 임시값이고 청취 상관 검증 전에는 음악 품질의 근거나 서명 지표로 쓰지 않는다.** 규칙 변경 전/후 비교와 회귀 탐지용. "
+              "`midicheck_valid`·`note_integrity` 실패 곡은 `na`. 정의·한계: `src/prompt2midi/evalkit/proxy.py`, 해석: `docs/baseline-expressiveness-v0.md`. CSV 열은 `proxy_` 로 시작한다.", "",
+              "| 지표 | in_range | out_of_range | na | 범위 안 비율(분모=in+out) |", "|---|---|---|---|---|"]
+    for key, title, _fn, _names in P.PROXIES:
+        st = [r.proxy[key].status if key in r.proxy else P.NA for r in results]
+        i_, o_, n_ = st.count(P.IN_RANGE), st.count(P.OUT_OF_RANGE), st.count(P.NA)
+        lines.append(f"| {title} (`{P.COLUMN_PREFIX}{key}`) | {i_} | {o_} | {n_} | " + (f"{i_}/{i_ + o_} ({100 * i_ / (i_ + o_):.0f}%)" if i_ + o_ else "—") + " |")
+    lines += ["", "값의 분포(측정된 곡만, 합격 기준 아님):", "", "| 값 | 측정된 곡 수 | 최솟값 | 중앙값 | 최댓값 |", "|---|---|---|---|---|"]
+    for key, _title, _fn, names in P.PROXIES:
+        for nm in names:
+            vals = sorted(float(r.proxy[key].values[nm]) for r in results if key in r.proxy and r.proxy[key].values.get(nm) is not None)
+            stats = f"{vals[0]:.4f} | {median(vals):.4f} | {vals[-1]:.4f}" if vals else "— | — | —"
+            lines.append(f"| `{P.COLUMN_PREFIX}{key}_{nm}` | {len(vals)}/{n} | {stats} |")
     lines += ["", "## 청취가 필요한 항목", "",
               f"무드 부합·음악성은 **점수화하지 않는다.** CSV 의 `{LISTEN_COLUMNS[0]}`, `{LISTEN_COLUMNS[1]}` 열은 전 {n}개 모두 `{LISTEN_TEXT}`이며 청취 루브릭(연구 1팀)으로 채점한다.", ""]
     fails = [(r.id, m.name, r.results[m.name].reason) for r in results for m in METRICS if r.results[m.name].status == FAIL]

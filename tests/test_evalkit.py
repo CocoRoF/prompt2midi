@@ -7,7 +7,7 @@ import pytest
 
 from prompt2midi import evalkit
 from prompt2midi.evalkit import __main__ as cli
-from prompt2midi.evalkit import model, report, runner
+from prompt2midi.evalkit import model, proxy, report, runner
 from prompt2midi.evalkit.metrics import METRICS, LISTEN_COLUMNS
 from prompt2midi.providers import FakeProvider
 from prompt2midi.providers.base import ProviderError
@@ -176,7 +176,7 @@ def test_csv_columns_and_listening_columns(tmp_path):
     for m in METRICS:
         assert m.name in rows[0] and m.name + "_reason" in rows[0]
     assert all(r[c] == "청취 필요" for r in rows for c in LISTEN_COLUMNS)
-    assert "mood_fit" not in rows[0] and not any("score" in k for k in rows[0])
+    assert "mood_fit" not in rows[0] and not any("score" in k and not k.startswith("proxy_") for k in rows[0])
 
 
 @pytest.mark.parametrize("provider", ["fake", "rule"])
@@ -323,8 +323,6 @@ V01_COLUMNS = (  # the columns of PR #21/#23, in order: they must stay the first
 )
 
 
-EXPR_NAMES = ["melody_repetition", "melody_variation", "step_ratio", "leap_ratio", "contour_diversity", "final_is_tonic",
-              "section_density_gap", "section_register_gap", "chord_voice_distance", "off_scale_rate"]
 V02_COLUMNS = V01_COLUMNS + ["provider", "labels", "tempo_match_value", "scale_deviation_value", "pitch_range_value",
                              "bars_match_value", "bars_min_value", "axis1_ok", "곡ID", "언어"]
 
@@ -378,7 +376,7 @@ def test_csv_keeps_the_old_columns_first_and_appends_the_new_ones(tmp_path):
     assert cols[:len(V01_COLUMNS)] == V01_COLUMNS
     assert cols[:len(V02_COLUMNS)] == V02_COLUMNS                      # v0.2 (PR #25) order is kept as well
     assert cols[len(V02_COLUMNS):len(V02_COLUMNS) + 2] == ["no_empty_tracks_value", "midi_instruments_included_value"]   # v0.3 additions
-    assert cols[len(V02_COLUMNS) + 2:] == ["expr_" + n for n in EXPR_NAMES]                                          # v0.5 additions go last
+    assert cols[len(V02_COLUMNS) + 2:] == proxy.column_names() and cols[len(V02_COLUMNS) + 2].startswith("proxy_m1")        # v0.6: proxy M1..M7 columns go last
     assert not any("시각" in c or "time" in c.lower().replace("time_signature", "") for c in cols)   # still no measurement time
     out = tmp_path / "out"
     cli.main([str(write(tmp_path, SET5)), "--provider", "fake", "--out", str(out)])
@@ -506,7 +504,7 @@ def test_new_summary_is_deterministic_and_has_the_new_version(tmp_path):
         cli.main([str(write(tmp_path, SET5)), "--provider", "rule", "--tempo-tol", "0.1", "--out", str(tmp_path / d)])
     for f in ("results.csv", "summary.md"):
         assert (tmp_path / "a" / f).read_bytes() == (tmp_path / "b" / f).read_bytes()
-    assert f"`evalkit_version` {EVALKIT_VERSION}" in (tmp_path / "a" / "summary.md").read_text(encoding="utf-8") and EVALKIT_VERSION == "0.5.0"
+    assert f"`evalkit_version` {EVALKIT_VERSION}" in (tmp_path / "a" / "summary.md").read_text(encoding="utf-8") and EVALKIT_VERSION == "0.6.0"
 
 
 # ---------- v0.4: genre label (jazz/blues relax the scale-deviation limit to 25%) ----------
@@ -560,7 +558,7 @@ def test_genre_in_labels_column_summary_header_and_schema(tmp_path):
     rows = {r["id"]: r for r in csv.DictReader(open(out / "results.csv", encoding="utf-8"))}
     assert rows["p1"]["labels"] == "tonic;mode;tempo_bpm;time_signature;bars;instruments;genre" and "genre" not in rows["p2"]["labels"]
     md = (out / "summary.md").read_text(encoding="utf-8")
-    assert "음계 이탈 ≤10% (genre 라벨에 jazz·blues 가 있으면 ≤25%)" in md and "`evalkit_version` 0.5.0" in md
+    assert "음계 이탈 ≤10% (genre 라벨에 jazz·blues 가 있으면 ≤25%)" in md and "`evalkit_version` 0.6.0" in md
     assert list(rows["p1"]) == report.columns() and report.columns()[:len(V02_COLUMNS)] == V02_COLUMNS and report.columns()[len(V02_COLUMNS):len(V02_COLUMNS) + 2] == ["no_empty_tracks_value", "midi_instruments_included_value"]
     props = model.json_schema()["$defs"]["Expect"]["properties"]
     assert "genre" in props and "genre" not in model.json_schema()["$defs"]["Expect"].get("required", [])

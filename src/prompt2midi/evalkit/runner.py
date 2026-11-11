@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from ..pipeline import GenerationError, generate
 from ..providers import FakeProvider, RuleProvider
 from ..spec import total_bars
-from .expressiveness import measure
-from .metrics import METRICS, Context, Result
+from .proxy import ProxyResult, evaluate as evaluate_proxies
+from .metrics import METRICS, Context, Result, midicheck_valid, note_integrity
 from .model import EvalSet
 
 PROVIDERS = ("rule", "fake")  # "llm" is accepted by the CLI but never run here (no keys, no calls)
@@ -55,7 +55,7 @@ class ItemResult:
     bars: int | None
     midi_sha8: str
     results: dict[str, Result] = field(default_factory=dict)
-    expr: dict[str, float | None] = field(default_factory=dict)  # expressiveness proxy VALUES (no verdicts)
+    proxy: dict[str, ProxyResult] = field(default_factory=dict)  # M1..M7: in_range/out_of_range/na + values (NOT pass/fail)
 
 
 def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_retries: int = 2, check_determinism: bool = True, tempo_tol: float | None = None) -> list[ItemResult]:
@@ -72,11 +72,15 @@ def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_ret
             attempts, err = len(exc.attempts), str(exc)[:300]
         except ValueError as exc:  # prompt rejected by generate() (e.g. too long)
             err = str(exc)[:300]
+        # proxies M1..M7 are skipped (na) for pieces that failed midicheck_valid or note_integrity
+        base = Context(item.expect, spec, midi, err)
+        valid = midi is not None and midicheck_valid(base).status != "fail" and note_integrity(base).status != "fail"
+        proxies = evaluate_proxies(midi, spec, item.expect, valid)
         det = None
         if check_determinism and midi is not None:
             try:
                 again = generate(item.text, provider=make_provider(provider), fallback=fallback, max_retries=max_retries)
-                det = again.midi == midi
+                det = again.midi == midi and evaluate_proxies(again.midi, again.spec, item.expect, valid) == proxies   # new indicators must be deterministic too
             except (GenerationError, ValueError):
                 det = False
         ctx = Context(item.expect, spec, midi, err, det, tempo_tol)
@@ -84,6 +88,6 @@ def run_set(eval_set: EvalSet, provider: str, *, fallback: bool = False, max_ret
             item.id, item.lang, item.tier, midi is not None, provider, labels_of(item), err, used if midi is not None else "", attempts, fb,
             total_bars(spec) if spec is not None else None, hashlib.sha256(midi).hexdigest()[:8] if midi else "",
             {m.name: m.fn(ctx) for m in METRICS},
-            measure(midi, spec, item.expect),
+            proxies,
         ))
     return out

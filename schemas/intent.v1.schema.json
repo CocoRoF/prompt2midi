@@ -1,0 +1,405 @@
+{
+  "$defs": {
+    "Conflict": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/FieldName"
+          },
+          "maxItems": 9,
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fields",
+        "reason"
+      ],
+      "title": "Conflict",
+      "type": "object"
+    },
+    "FieldName": {
+      "enum": [
+        "tonic",
+        "mode",
+        "tempo_bpm",
+        "time_signature",
+        "bars",
+        "mood",
+        "genre",
+        "instruments",
+        "chords"
+      ],
+      "title": "FieldName",
+      "type": "string"
+    },
+    "Genre": {
+      "enum": [
+        "pop",
+        "rock",
+        "jazz",
+        "blues",
+        "ballad",
+        "bossa_nova",
+        "electronic",
+        "ambient",
+        "classical",
+        "lofi"
+      ],
+      "title": "Genre",
+      "type": "string"
+    },
+    "InstrumentName": {
+      "enum": [
+        "piano",
+        "electric_piano",
+        "organ",
+        "nylon_guitar",
+        "steel_guitar",
+        "upright_bass",
+        "electric_bass",
+        "synth_bass",
+        "violin",
+        "strings",
+        "trumpet",
+        "sax",
+        "flute",
+        "clarinet",
+        "marimba",
+        "synth_lead",
+        "synth_pad",
+        "drums"
+      ],
+      "title": "InstrumentName",
+      "type": "string"
+    },
+    "Mode": {
+      "enum": [
+        "major",
+        "minor",
+        "dorian",
+        "mixolydian",
+        "lydian",
+        "phrygian",
+        "harmonic_minor"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "Mood": {
+      "enum": [
+        "calm",
+        "relaxing",
+        "sad",
+        "dark",
+        "happy",
+        "playful",
+        "energetic",
+        "epic",
+        "romantic",
+        "meditative"
+      ],
+      "title": "Mood",
+      "type": "string"
+    },
+    "Raw": {
+      "additionalProperties": false,
+      "description": "The original wording behind a field, when it was normalised (e.g. 'Am' -> tonic A + mode minor).",
+      "properties": {
+        "bars": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bars"
+        },
+        "chords": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Chords"
+        },
+        "genre": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Genre"
+        },
+        "instruments": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Instruments"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mode"
+        },
+        "mood": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mood"
+        },
+        "tempo_bpm": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tempo Bpm"
+        },
+        "time_signature": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Time Signature"
+        },
+        "tonic": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tonic"
+        }
+      },
+      "required": [
+        "tonic",
+        "mode",
+        "tempo_bpm",
+        "time_signature",
+        "bars",
+        "mood",
+        "genre",
+        "instruments",
+        "chords"
+      ],
+      "title": "Raw",
+      "type": "object"
+    },
+    "Tonic": {
+      "enum": [
+        "C",
+        "C#",
+        "Db",
+        "D",
+        "D#",
+        "Eb",
+        "E",
+        "F",
+        "F#",
+        "Gb",
+        "G",
+        "G#",
+        "Ab",
+        "A",
+        "A#",
+        "Bb",
+        "B"
+      ],
+      "title": "Tonic",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "bars": {
+      "anyOf": [
+        {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Bars"
+    },
+    "chords": {
+      "anyOf": [
+        {
+          "items": {
+            "pattern": "^[A-G](#|b)?(m7b5|maj7|dim|aug|sus2|sus4|m7|m|7)?$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Chords"
+    },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/Conflict"
+      },
+      "maxItems": 8,
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "genre": {
+      "items": {
+        "$ref": "#/$defs/Genre"
+      },
+      "maxItems": 3,
+      "title": "Genre",
+      "type": "array"
+    },
+    "instruments": {
+      "items": {
+        "$ref": "#/$defs/InstrumentName"
+      },
+      "maxItems": 8,
+      "title": "Instruments",
+      "type": "array"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Mode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mood": {
+      "items": {
+        "$ref": "#/$defs/Mood"
+      },
+      "maxItems": 3,
+      "title": "Mood",
+      "type": "array"
+    },
+    "raw": {
+      "$ref": "#/$defs/Raw"
+    },
+    "tempo_bpm": {
+      "anyOf": [
+        {
+          "maximum": 200,
+          "minimum": 40,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Tempo Bpm"
+    },
+    "time_signature": {
+      "anyOf": [
+        {
+          "enum": [
+            "2/4",
+            "3/4",
+            "4/4",
+            "5/4",
+            "6/8",
+            "7/8"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Time Signature"
+    },
+    "tonic": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Tonic"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "version": {
+      "const": "1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "tonic",
+    "mode",
+    "tempo_bpm",
+    "time_signature",
+    "bars",
+    "mood",
+    "genre",
+    "instruments",
+    "chords",
+    "conflicts",
+    "raw"
+  ],
+  "title": "Intent",
+  "type": "object"
+}

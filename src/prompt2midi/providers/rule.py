@@ -10,24 +10,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..presets import DEFAULT_TONIC, MOOD_ORDER, MOODS, MOTIFS, NAMES, PROGRESSIONS, triad as _triad  # noqa: F401  (shared with the expander)
 from ..spec import MODE_INTERVALS, PITCH_CLASS, TIME_SIGNATURES
 
 # ----- dictionaries (English + a few Korean words) -----
-
-# mood id -> (trigger words, energy 0..1, preferred mode, default bpm, motif key)
-MOODS: dict[str, tuple[tuple[str, ...], float, str, int, str]] = {
-    "calm": (("calm", "peace", "serene", "serenity", "gentle", "soft", "잔잔", "평화", "고요"), 0.25, "major", 72, "arch_slow"),
-    "relaxing": (("relax", "relaxing", "laid-back", "laid back", "chill", "lo-fi", "lofi", "편안", "여유"), 0.3, "dorian", 85, "arch_slow"),
-    "sad": (("sad", "melancholic", "melancholy", "sorrow", "grief", "lonely", "슬픈", "슬픔", "우울"), 0.3, "minor", 62, "fall"),
-    "dark": (("dark", "mysterious", "tension", "ominous", "eerie", "어두운", "긴장", "미스터리"), 0.5, "phrygian", 80, "fall"),
-    "happy": (("happy", "cheerful", "upbeat", "joy", "joyful", "bright", "행복", "신나는", "밝은"), 0.7, "major", 120, "bounce"),
-    "playful": (("playful", "bouncy", "fun", "quirky", "경쾌", "장난"), 0.7, "mixolydian", 128, "bounce"),
-    "energetic": (("energetic", "powerful", "intense", "driving", "aggressive", "에너지", "강렬", "격렬"), 0.9, "minor", 140, "drive"),
-    "epic": (("epic", "heroic", "triumphant", "grand", "cinematic", "웅장", "영웅"), 0.8, "major", 100, "rise"),
-    "romantic": (("romantic", "tender", "love", "warmth", "warm", "로맨틱", "사랑", "따뜻"), 0.4, "major", 90, "arch_slow"),
-    "meditative": (("meditative", "meditation", "ambient", "zen", "명상", "앰비언트"), 0.15, "lydian", 58, "arch_slow"),
-}
-MOOD_ORDER = tuple(MOODS)  # tie-break order
 
 # instrument -> trigger words; order inside a list decides who becomes the lead
 INSTRUMENT_WORDS: list[tuple[str, tuple[str, ...]]] = [
@@ -69,27 +55,6 @@ TEMPO_WORDS = [
 ]
 
 MODE_WORDS = tuple(MODE_INTERVALS)  # major minor dorian mixolydian lydian phrygian harmonic_minor
-
-# diatonic progressions (scale degrees) per mode, section A and section B
-PROGRESSIONS: dict[str, tuple[list[int], list[int]]] = {
-    "major": ([1, 5, 6, 4], [4, 1, 5, 1]),
-    "minor": ([1, 6, 3, 7], [4, 1, 5, 1]),
-    "dorian": ([1, 4, 1, 7], [4, 1, 7, 1]),
-    "mixolydian": ([1, 7, 4, 1], [4, 1, 7, 1]),
-    "lydian": ([1, 2, 1, 5], [1, 2, 5, 1]),
-    "phrygian": ([1, 2, 1, 7], [1, 7, 6, 1]),
-    "harmonic_minor": ([1, 4, 5, 1], [6, 4, 5, 1]),
-}
-
-MOTIFS: dict[str, tuple[list[int], list[str]]] = {
-    "arch_slow": ([1, 3, 5, 3, 2], ["h", "q", "q", "h", "h"]),
-    "fall": ([5, 4, 3, 2, 1], ["q", "q", "q", "q", "h"]),
-    "bounce": ([1, 3, 5, 3, 6, 5], ["e", "e", "q", "e", "e", "q"]),
-    "drive": ([1, 1, 3, 5, 3, 1], ["e", "e", "e", "e", "q", "q"]),
-    "rise": ([1, 5, 8, 5, 6, 8], ["q", "q", "h", "q", "q", "h"]),
-}
-
-DEFAULT_TONIC = {"major": "C", "minor": "A", "dorian": "D", "mixolydian": "G", "lydian": "F", "phrygian": "E", "harmonic_minor": "A"}
 
 _KEY_RE = re.compile(r"\b([A-G])(?:[- ]?(sharp|flat)|([#b]))?[- ]?(major|minor|dorian|mixolydian|lydian|phrygian|harmonic minor)\b")
 _SIG_RE = re.compile(r"\b([2-7])\s*/\s*([48])\b")
@@ -186,25 +151,6 @@ MAX_PROMPT_CHARS = 2000
 
 def _has(text: str, words) -> bool:
     return any(w in text for w in words)
-
-
-def _triad(mode: str, tonic_pc: int, degree: int) -> str:
-    iv = MODE_INTERVALS[mode]
-    root = iv[degree - 1]
-    third = (iv[(degree + 1) % 7] - root) % 12
-    fifth = (iv[(degree + 3) % 7] - root) % 12
-    pc = (tonic_pc + root) % 12
-    name = NAMES[pc]
-    if third == 3 and fifth == 7:
-        return name + "m"
-    if third == 3 and fifth == 6:
-        return name + "dim"
-    if third == 4 and fifth == 8:
-        return name + "aug"
-    return name
-
-
-NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
 
 
 class RuleProvider:

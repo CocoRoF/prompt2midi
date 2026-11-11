@@ -248,3 +248,19 @@ def test_no_old_word_was_lost_and_only_the_agreed_words_were_added():
 def test_the_lexicon_is_shipped_with_the_package():
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "package-data" in text and "lexicon/*.json" in text
+
+
+import pytest
+
+
+@pytest.mark.parametrize("text,sig", [("6/8박자", "6/8"), ("빠른 록 기타 곡 6/8박자", "6/8"), ("3/4박자 왈츠풍", "3/4"), ("7/8박자로", "7/8"),
+                                      ("rock song in 6/8", "6/8"), ("6/8 박자 곡", "6/8")])
+def test_slash_meter_directly_followed_by_korean(text, sig):
+    from prompt2midi.translate.extract import translate as extract
+    assert extract(text).intent.time_signature == sig
+
+
+@pytest.mark.parametrize("text", ["16/8 beats", "a6/8", "12/8박자", "6/80"])
+def test_slash_meter_not_read_inside_longer_tokens(text):
+    from prompt2midi.translate.extract import translate as extract
+    assert extract(text).intent.time_signature in (None,)

@@ -29,6 +29,7 @@ LISTEN_COLUMNS = ("mood_listen", "musicality_listen")  # always "청취 필요":
 class Result:
     status: str
     reason: str = ""
+    value: float | int | None = None  # the measured number for numeric metrics (CSV `<metric>_value`); None when not measured
 
 
 @dataclass
@@ -40,6 +41,7 @@ class Context:
     midi: bytes | None
     error: str = ""
     deterministic: bool | None = None  # None = not checked
+    tempo_tol: float | None = None  # None = absolute +-TEMPO_TOLERANCE_BPM (default); else relative, e.g. 0.10 = +-10% (neural providers)
 
 
 def _tempo_in_midi(midi: bytes) -> float | None:
@@ -99,8 +101,11 @@ def tempo_match(ctx: Context) -> Result:
     got = _tempo_in_midi(ctx.midi)
     if got is None:
         return Result(FAIL, "MIDI 에 set_tempo 가 없음")
-    ok = abs(got - want) <= TEMPO_TOLERANCE_BPM
-    return Result(PASS if ok else FAIL, f"MIDI {got:.2f} BPM, 라벨 {want} (허용 ±{TEMPO_TOLERANCE_BPM})")
+    if ctx.tempo_tol is None:
+        ok, allowed = abs(got - want) <= TEMPO_TOLERANCE_BPM, f"±{TEMPO_TOLERANCE_BPM} BPM"
+    else:
+        ok, allowed = abs(got - want) / want <= ctx.tempo_tol + 1e-9, f"±{ctx.tempo_tol:.0%}"
+    return Result(PASS if ok else FAIL, f"MIDI {got:.2f} BPM, 라벨 {want} (허용 {allowed})", round(got, 2))
 
 
 def key_match(ctx: Context) -> Result:
@@ -135,7 +140,7 @@ def bars_match(ctx: Context) -> Result:
     if (f := _failed(ctx)):
         return f
     got = total_bars(ctx.spec)
-    return Result(PASS if got == want else FAIL, f"{got}마디, 라벨 {want}")
+    return Result(PASS if got == want else FAIL, f"{got}마디, 라벨 {want}", got)
 
 
 def bars_min(ctx: Context) -> Result:
@@ -146,7 +151,7 @@ def bars_min(ctx: Context) -> Result:
         return f
     got = total_bars(ctx.spec)
     note = "" if got == DEFAULT_BARS else f" (기본 {DEFAULT_BARS}마디와 다름)"
-    return Result(PASS if got >= MIN_BARS else FAIL, f"{got}마디, 최소 {MIN_BARS}{note}")
+    return Result(PASS if got >= MIN_BARS else FAIL, f"{got}마디, 최소 {MIN_BARS}{note}", got)
 
 
 def instruments_included(ctx: Context) -> Result:
@@ -176,7 +181,7 @@ def pitch_range(ctx: Context) -> Result:
         out += sum(1 for p in pitches if not rng[0] <= p <= rng[1])
     if total == 0:
         return Result(NA, "음높이가 있는 음표가 없음")
-    return Result(PASS if out / total <= OUT_OF_RANGE_MAX else FAIL, f"악기 음역 밖 {_frac(out, total)}, 허용 ≤{OUT_OF_RANGE_MAX:.0%}")
+    return Result(PASS if out / total <= OUT_OF_RANGE_MAX else FAIL, f"악기 음역 밖 {_frac(out, total)}, 허용 ≤{OUT_OF_RANGE_MAX:.0%}", round(out / total, 4))
 
 
 def note_integrity(ctx: Context) -> Result:
@@ -222,7 +227,7 @@ def scale_deviation(ctx: Context) -> Result:
     if not pitches:
         return Result(NA, "음높이가 있는 음표가 없음")
     out = sum(1 for p in pitches if p % 12 not in scale)
-    return Result(PASS if out / len(pitches) <= OFF_SCALE_MAX else FAIL, f"음계 밖 {_frac(out, len(pitches))}, 허용 ≤{OFF_SCALE_MAX:.0%}")
+    return Result(PASS if out / len(pitches) <= OFF_SCALE_MAX else FAIL, f"음계 밖 {_frac(out, len(pitches))}, 허용 ≤{OFF_SCALE_MAX:.0%}", round(out / len(pitches), 4))
 
 
 def midicheck_valid(ctx: Context) -> Result:
@@ -245,6 +250,15 @@ class Metric:
     name: str
     title: str
     fn: Callable[[Context], Result]
+
+
+# Metrics that also write a number to the CSV (`<name>_value`).
+VALUE_METRICS = ("tempo_match", "scale_deviation", "pitch_range", "bars_match", "bars_min")
+# 연구 1팀 axis 1 (MIDI validity, docs/eval-metrics.md section 7) as implemented here: a piece that fails any of
+# these is dropped from the axis 2/3 aggregation. Instruments are deliberately NOT here: 3-7 (instrument match) is an
+# axis 3 measure and must not be filtered by itself. `deterministic` is a harness property, in neither group.
+AXIS1_METRICS = ("midicheck_valid", "pitch_range", "note_integrity", "no_empty_tracks", "bars_min")
+AXIS23_METRICS = ("tempo_match", "key_match", "time_signature_match", "bars_match", "instruments_included", "midi_instruments_included", "scale_deviation")
 
 
 # Order = column order. Add new metrics here (e.g. Intent v1 field match, once its schema exists).

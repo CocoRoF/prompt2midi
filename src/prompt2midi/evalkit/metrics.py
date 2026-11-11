@@ -254,12 +254,12 @@ class Metric:
 
 # Metrics that also write a number to the CSV (`<name>_value`). V03 columns were added later and go last (CSV order is kept).
 VALUE_METRICS = ("tempo_match", "scale_deviation", "pitch_range", "bars_match", "bars_min")
-VALUE_METRICS_V03 = ("no_empty_tracks", "midi_instruments_included")  # 1-8 (track/instrument layout): recorded, not part of axis 1
+VALUE_METRICS_V03 = ("no_empty_tracks", "midi_instruments_included")  # 1-8 values: recorded as columns (empty tracks also stay in axis 1)
 # 연구 1팀 axis 1 (MIDI validity, docs/eval-metrics.md section 7) as implemented here: a piece that fails any of
-# these is dropped from the axis 2/3 aggregation. 1-8 (empty tracks, instruments) is deliberately NOT here (연구 1팀 2차 회신):
-# it is recorded as value columns only; instrument match counts as axis 3 (3-7) only.
+# these is dropped from the axis 2/3 aggregation. 1-8 split (연구 1팀 3차 회신): empty tracks are a file-structure defect and stay in
+# axis 1; the instrument measure (midi_instruments_included) is NOT here and counts as axis 3 (3-7) only. Both values are CSV columns.
 # `deterministic` is a harness property, in no group.
-AXIS1_METRICS = ("midicheck_valid", "pitch_range", "note_integrity", "bars_min")
+AXIS1_METRICS = ("midicheck_valid", "pitch_range", "note_integrity", "no_empty_tracks", "bars_min")
 # Axis 2/3 = what the finished piece (the MIDI) does. Aggregated over axis-1-passing pieces only.
 AXIS23_METRICS = ("tempo_match", "time_signature_match", "midi_instruments_included", "scale_deviation")
 # Spec extraction = label vs the *declared spec* (not the piece). Not an axis 2/3 measure; summary.md has its own section.

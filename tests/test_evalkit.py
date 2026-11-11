@@ -470,17 +470,19 @@ def test_csv_keeps_the_key_match_column_name(tmp_path):
     assert [r["key_match"] for r in rows] == ["pass", "fail", "na", "pass", "na"]
 
 
-def test_one_eight_is_recorded_as_values_but_excluded_from_axis1():
+def test_one_eight_split_empty_tracks_in_axis1_instruments_in_axis3():
     from prompt2midi.evalkit.metrics import AXIS1_METRICS, AXIS23_METRICS, EXTRACTION_METRICS, Result
-    assert "no_empty_tracks" not in AXIS1_METRICS and "midi_instruments_included" not in AXIS1_METRICS
+    assert "no_empty_tracks" in AXIS1_METRICS and "midi_instruments_included" not in AXIS1_METRICS   # 연구 1팀 3차 회신
     assert "instruments_included" not in AXIS1_METRICS and "instruments_included" not in AXIS23_METRICS   # spec-based: extraction
-    assert set(AXIS1_METRICS) == {"midicheck_valid", "pitch_range", "note_integrity", "bars_min"}
+    assert set(AXIS1_METRICS) == {"midicheck_valid", "pitch_range", "note_integrity", "no_empty_tracks", "bars_min"}
     assert not set(EXTRACTION_METRICS) & set(AXIS23_METRICS)                       # no metric is counted in both groups
     results = {m.name: Result("pass") for m in METRICS}
     r = runner.ItemResult("x", "en", "A", True, "fake", [], "", "fake", 1, False, 12, "abcd1234", dict(results))
     r.results["no_empty_tracks"] = Result("fail", "빈 트랙 1개", 1)
     r.results["midi_instruments_included"] = Result("fail", "빠짐", 0.5)
-    assert report.axis1_ok(r) is True                                              # 1-8 failures do not drop the piece
+    assert report.axis1_ok(r) is False                                             # an empty track is a file defect: axis 1
+    r.results["no_empty_tracks"] = Result("pass", "", 0)
+    assert report.axis1_ok(r) is True                                              # instrument failure alone does not drop the piece
     r.results["bars_min"] = Result("fail")
     assert report.axis1_ok(r) is False
 

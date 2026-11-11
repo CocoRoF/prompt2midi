@@ -111,7 +111,7 @@ def summary_md(results: list[ItemResult], *, set_name: str, set_sha: str, provid
         lines.append(f"| {titles[name]} (`{name}`) | " + " | ".join(_cell(g, name) for _, g in groups) + " |")
     ok_groups = [(g, [r for r in rs if axis1_ok(r)]) for g, rs in groups]
     lines += ["", "## 축 1 통과 곡만의 집계 (축 2·3 지표)", "",
-              "연구 1팀 규칙: 축 1(MIDI 유효성) 실패 곡은 이후 축 2·3 집계에서 뺀다. 축 1 = " + ", ".join(f"`{m}`" for m in AXIS1_METRICS) + " (모두 pass 또는 na). 1-8(빈 트랙·악기 구성)은 축 1 집계에서 제외하고 `no_empty_tracks_value`·`midi_instruments_included_value` 열에만 기록하며, 악기 일치는 축 3(3-7)으로만 집계한다. 사양 추출 지표는 이 표에 넣지 않는다(위 절). 분모 규칙은 위와 같다.", "",
+              "연구 1팀 규칙: 축 1(MIDI 유효성) 실패 곡은 이후 축 2·3 집계에서 뺀다. 축 1 = " + ", ".join(f"`{m}`" for m in AXIS1_METRICS) + " (모두 pass 또는 na). 1-8 중 빈 트랙(`no_empty_tracks`)은 파일 구조 결함이라 축 1 에 두고, 악기 구성(`midi_instruments_included`)만 축 1 에서 빼 축 3(3-7)으로 집계한다. 두 값은 `no_empty_tracks_value`·`midi_instruments_included_value` 열에 기록한다. 사양 추출 지표는 이 표에 넣지 않는다(위 절). 분모 규칙은 위와 같다.", "",
               "| 지표 | " + " | ".join(g for g, _ in ok_groups) + " |", "|---|" + "---|" * len(ok_groups),
               "| 축 1 통과 곡 수 / 전체 | " + " | ".join(f"{len(rs)}/{len(all_g)}" for (_, rs), (_, all_g) in zip(ok_groups, groups)) + " |"]
     for name in AXIS23_METRICS:

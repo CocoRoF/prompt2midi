@@ -1,6 +1,6 @@
 # 평가 지표 정의 (evalkit) — 초안 v0.3
 
-- 상태: **초안. 연구 1팀 서명 대기**(연구 1팀 검토 회신 `받은 자료/연구 1팀/evalkit_지표_검토_회신.md`와 2차 회신[1-8 축 1 제외, key_match 분리] 반영, 서명은 배채린 님이 임계값을 확인한 뒤). 연구 1팀 `자동채점_항목_정리.md`(26항목) **수령함**(받은 자료/연구 1팀/자동채점_항목_정리.md, 2026-11-11). 그 번호와 이 문서의 지표 이름의 대응은 7절, `results.csv` 열의 대응은 8절. 지금 지표 목록은 합의안(`docs/프롬프트투미디/2단계-계획서-합의안.md` 2절, 8절 '지표 정의 문서')의 "지금 가능" 항목에서 개발 1팀이 먼저 정리한 것이다. 항목 선정·임계값 검토는 연구 1팀, 문서화·구현은 개발 1팀.
+- 상태: **초안. 연구 1팀 서명 대기**(연구 1팀 검토 회신 `받은 자료/연구 1팀/evalkit_지표_검토_회신.md`와 2·3차 회신[1-8 분할: 빈 트랙 축 1 유지·악기 축 3, key_match 분리, 3-8a/3-8b] 반영, 서명은 배채린 님이 임계값을 확인한 뒤). 연구 1팀 `자동채점_항목_정리.md`(26항목) **수령함**(받은 자료/연구 1팀/자동채점_항목_정리.md, 2026-11-11). 그 번호와 이 문서의 지표 이름의 대응은 7절, `results.csv` 열의 대응은 8절. 지금 지표 목록은 합의안(`docs/프롬프트투미디/2단계-계획서-합의안.md` 2절, 8절 '지표 정의 문서')의 "지금 가능" 항목에서 개발 1팀이 먼저 정리한 것이다. 항목 선정·임계값 검토는 연구 1팀, 문서화·구현은 개발 1팀.
 - 구현: `src/prompt2midi/evalkit/` · 실행: `python -m prompt2midi.evalkit <세트.json> --provider rule|fake [--out DIR] [--fallback]`
 - 외부 데이터·LLM 호출·키 없음. `--provider llm` 은 "미실행(키 없음)"을 출력하고 종료 코드 0 으로 끝난다.
 
@@ -56,7 +56,7 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 `--out DIR`(기본 `out/evalkit`, `.gitignore` 대상)에 두 파일을 쓴다.
 - `results.csv`: 프롬프트별 한 줄. **열 순서: (v0.1 열 그대로) → [v0.2] `provider`, `labels`, 수치 지표의 `<지표>_value`(`tempo_match`, `scale_deviation`, `pitch_range`, `bars_match`, `bars_min`), `axis1_ok`, 별칭 `곡ID`, `언어` → [v0.3] `no_empty_tracks_value`, `midi_instruments_included_value`.** 기존 열 이름·순서는 바꾸지 않았고(시험이 고정), 새 열은 모두 끝에 붙는다. 측정 시각 열은 없다.
   - `provider`: 요청한 공급자. `labels`: 라벨이 있는 필드 이름(`;` 구분). `<지표>_value`: 측정한 숫자(템포는 MIDI 의 BPM, 음계 이탈·음역은 비율, 마디는 마디 수), 측정하지 않았으면 빈 칸.
-  - `axis1_ok`: 생성에 성공했고 축 1 지표(`midicheck_valid`, `pitch_range`, `note_integrity`, `bars_min`)가 모두 pass 또는 na. **1-8(빈 트랙·악기 구성)은 축 1 집계에서 제외**한다(연구 1팀 2차 회신): 값은 `no_empty_tracks_value`(빈 트랙 수)·`midi_instruments_included_value`(라벨 악기 중 MIDI 에 있는 비율)에 계속 기록하고, 악기 일치는 축 3(3-7)으로만 집계한다. `deterministic` 은 하네스 속성이라 어느 축에도 넣지 않았다.
+  - `axis1_ok`: 생성에 성공했고 축 1 지표(`midicheck_valid`, `pitch_range`, `note_integrity`, `no_empty_tracks`, `bars_min`)가 모두 pass 또는 na. **1-8 은 분할**한다(연구 1팀 3차 회신): 빈 트랙(`no_empty_tracks`)은 파일 구조 결함이라 축 1 에 두고, 악기 구성(`midi_instruments_included`)만 축 1 에서 빼 축 3(3-7)으로 집계한다. 값은 `no_empty_tracks_value`(빈 트랙 수)·`midi_instruments_included_value`(라벨 악기 중 MIDI 에 있는 비율)에 기록한다. `deterministic` 은 하네스 속성이라 어느 축에도 넣지 않았다.
   - `곡ID`, `언어`: 연구 1팀 제안 이름의 별칭(`id`, `lang` 과 같은 값).
 - `summary.md`: 머리에 `evalkit_version`(코드 버전 상수), 세트 이름·크기·파일 해시, 공급자, 폴백, **실행한 허용오차**(템포 기본/옵션 값, 마디 정확 일치, 음계 이탈·음역·길이 임계값), **유효 곡 비율**(생성 성공, `axis1_ok`). 층(A/B/C) × 언어(ko/en) 그룹과 층별·언어별·전체 열, **곡(MIDI) 지표별** `통과/분모 (비율) · na N`, 분모 규칙, **'사양 추출 일치(라벨 ↔ 사양 선언)' 절**(`조성 선언 일치`·`마디 수 선언 일치`·`악기 선언 일치` — 축 1 로 거르지 않고 모든 곡 대상, Intent v1 일치율 지표가 들어올 자리), **2-3 음계 이탈의 라벨 조(tonic+mode)가 있는 항목 수**, **축 1 통과 곡만의 집계**(연구 1팀 규칙: 축 1 실패 곡은 이후 축 2·3 집계에서 뺀다 — `tempo_match`, `time_signature_match`, `midi_instruments_included`, `scale_deviation`), 재시도·폴백·생성 실패 개수, 실패 목록, 읽는 법과 한계.
 - **재현성**: 시각·실행 시간·경로를 넣지 않는다. 같은 코드·같은 세트·같은 공급자·같은 허용오차면 두 파일이 바이트 단위로 같다(시험이 확인).
@@ -83,9 +83,9 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 | 5 | `expect` 필드 목록·악기 17종 + drums | 배채린 님 세트(D2)를 `schemas/evalset.v1.schema.json` 형식으로 받은 뒤 대조 |
 | 6 | 층 A/B/C | 집계 단위로만 사용. 정의는 세트 작성자(배채린 님) |
 | 7 | 보류 세트 20개 | 개발 1팀은 열지 않음. 레포에 없음(`.gitignore` 의 `data/eval/holdout*`) |
-| 8 | **2차 회신(1-8)**: 1-8 은 축 1 집계에서 제외, 값 열로 기록 | 반영(v0.3): `axis1_ok` 에서 `no_empty_tracks` 제외, `no_empty_tracks_value`·`midi_instruments_included_value` 추가 |
+| 8 | **2·3차 회신(1-8)**: 악기(`midi_instruments_included`)만 축 1 에서 제외, 빈 트랙(`no_empty_tracks`)은 축 1 유지(2차 회신 해석을 3차에서 정정) | 반영(v0.3): `axis1_ok` 에서 악기 지표만 제외, `no_empty_tracks_value`·`midi_instruments_included_value` 열 추가 |
 | 9 | **2차 회신(key_match)**: 사양 추출 점검이라 축 2 에서 빼고 별도 묶음 | 반영(v0.3): 표시 이름 `조성 선언 일치(사양 추출)`, 사양 추출 절로 분리, CSV 열 이름 유지 |
-| 10 | **확인 요청**: `bars_match`·`instruments_included` 도 같은 기준으로 사양 추출 묶음에 옮김, `tempo_match`·`time_signature_match` 는 곡 지표 유지 | 연구 1팀 확인 대기(7-1절) |
+| 10 | `bars_match`·`instruments_included` 사양 추출 묶음 이동, `tempo_match`·`time_signature_match` 곡 지표 유지, 3-8 분리(3-8a·3-8b 로 추적) | 연구 1팀 3차 회신 동의(7절·7-1절) |
 | 11 | 서명 | 연구 1팀 ______ (날짜 ______) — 배채린 님 확인 후 |
 
 ## 7. 연구 1팀 26항목 ↔ evalkit 지표 대응표
@@ -102,7 +102,7 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 | 1-5 | 템포·박자표 이벤트 존재 | **덮임** | `midicheck_valid` (+ `tempo_match`, `time_signature_match`) | `tempo_missing`, `signature_missing`, `*_late`(0틱이 아님)와 사양 불일치를 오류로 처리 |
 | 1-6 | 끝맺음 도달(EOS) | **na(규칙 공급자) · 적용(신경망)** | — | 토큰 생성 모델(text2midi 등)용 항목이라 규칙 공급자에는 해당 없음. 신경망 공급자에서는 적용 대상이며 생성 로그에 EOS 가 남는지는 연구 1팀(선지우 님 결과)이 확인 중이라 **evalkit 에는 아직 구현하지 않음**. 규칙 공급자에서는 `midicheck_valid` 가 길이·`note_past_end` 를 확인 |
 | 1-7 | 재생 가능성(사운드폰트 렌더) | **대기** ⚖ | — | 사운드폰트 선정과 라이선스 확인 전에는 구현·내려받기 안 함 |
-| 1-8 | 트랙·악기 구성 | **구현됨**(값 기록, 축 1 집계 제외) | `no_empty_tracks` + `midi_instruments_included` (+ `instruments_included` 사양 기준, 사양 추출 절) | 빈 트랙 0 + 요청 악기가 프로그램 체인지에 존재. 연구 1팀 2차 회신: **축 1 집계(`axis1_ok`)에서 제외**, 값은 `*_value` 열로 계속 기록 |
+| 1-8 | 트랙·악기 구성 | **구현됨**(빈 트랙은 축 1, 악기는 축 3 로 집계) | `no_empty_tracks` + `midi_instruments_included` (+ `instruments_included` 사양 기준, 사양 추출 절) | 빈 트랙 0 + 요청 악기가 프로그램 체인지에 존재. 연구 1팀 3차 회신: **악기 지표만 축 1(`axis1_ok`)에서 제외**, 빈 트랙은 축 1 유지. 값은 둘 다 `*_value` 열에 기록 |
 
 ### 축 2 — 음악 이론 부합
 | 번호 | 항목 | 상태 | evalkit 지표 | 비고 |
@@ -127,7 +127,7 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 | 3-5 | 무드 일치 | **대기**(+청취 필수) | `mood_listen` 열 | 객관 근사값은 단독 판정 불가. 점수화하지 않음 |
 | 3-6 | 무드 청취 평가 | **청취 전용** | `mood_listen` 열 | 청취 루브릭은 연구 1팀 |
 | 3-7 | 악기 일치 | **구현됨** | `midi_instruments_included` (곡). `instruments_included` 는 사양 추출 절 | 요청 악기 포함률 ≥ 90% 는 프롬프트별 pass/fail 의 비율로 읽는다(요약의 통과 비율) |
-| 3-8 | 길이·마디 수 일치 | **덮임 + 구현됨** | `bars_match`(라벨 ↔ 사양) + `midicheck_valid`(사양 ↔ MIDI 길이) | 두 단계를 거치면 라벨 ↔ MIDI 가 이어진다. ±10% 가 아니라 정확 일치(더 엄격) |
+| 3-8 | 길이·마디 수 일치 | **덮임 + 구현됨** | **3-8a** 곡 길이 = 사양 마디: `midicheck_valid`(`length_mismatch`) · **3-8b** 마디 수 선언 일치(라벨 ↔ 사양): `bars_match` | 두 단계를 거치면 라벨 ↔ MIDI 가 이어진다. ±10% 가 아니라 정확 일치(더 엄격) |
 | 3-9 | 모델 간 A/B 우위 | **청취 전용** | — | 블라인드 묶음·집계 도구는 개발 1팀 후속(합의안 Q4) |
 
 집계(26항목): 구현됨 8(1-2, 1-3, 1-4, 1-8, 2-3, 3-3, 3-7, 3-8 — 1-4·3-8 은 MidiCheck 가 일부를 덮음) · 덮임만 2(1-1, 1-5) · 규칙 공급자 na·신경망 적용 1(1-6) · 대기 12(1-7, 2-1, 2-2, 2-4, 2-5, 2-6, 2-7, 2-8, 3-1, 3-2, 3-4, 3-5) · 청취 전용 3(2-9, 3-6, 3-9).
@@ -146,7 +146,7 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 | `bars_match` | 사양의 섹션 마디 합 | **사양 추출** | 사양 값을 센다(사양 ↔ MIDI 길이는 `midicheck_valid` 의 `length_mismatch` 가 덮음 → 3-8) | **이동**(축 3 → 사양 추출) |
 | `instruments_included` | 사양의 트랙 악기 | **사양 추출** | 사양 값. MIDI 기준은 `midi_instruments_included` | **이동**(축 3 → 사양 추출) |
 
-이동으로 달라지는 점: 요약에서 `bars_match`, `instruments_included` 도 key_match 와 같은 절에 나온다. CSV 열 이름은 모두 그대로. 3-8(길이·마디 일치)의 '사양 ↔ MIDI' 쪽은 `midicheck_valid`(축 1), '라벨 ↔ 사양' 쪽은 `마디 수 선언 일치`로 나뉜다. **연구 1팀 확인 요청**: `bars_match`·`instruments_included` 이동, `tempo_match`·`time_signature_match` 를 곡 지표로 두는 판단, 3-8 이 둘로 나뉘는 것(6절).
+이동으로 달라지는 점: 요약에서 `bars_match`, `instruments_included` 도 key_match 와 같은 절에 나온다. CSV 열 이름은 모두 그대로. 3-8(길이·마디 일치)의 '사양 ↔ MIDI' 쪽은 `midicheck_valid`(축 1), '라벨 ↔ 사양' 쪽은 `마디 수 선언 일치`로 나뉜다. **연구 1팀 확인 요청**: `bars_match`·`instruments_included` 이동, `tempo_match`·`time_signature_match` 를 곡 지표로 두는 판단, 3-8 은 3-8a(곡 길이 = 사양 마디, `midicheck_valid`)·3-8b(마디 수 선언 일치, `bars_match`)로 묶어 추적한다. 세 항목 모두 연구 1팀 3차 회신으로 동의 확인.
 
 ## 8. `results.csv` 열 ↔ 연구 1팀 제안 형식 (v0.2 적용)
 
@@ -161,6 +161,6 @@ JSON Schema: `schemas/evalset.v1.schema.json` (코드의 모델에서 생성, �
 | 조건 유무 | `labels`(라벨이 있는 필드, **새 열**) + 지표별 `na` | 라벨이 없으면 해당 지표는 `na` |
 | 항목별 값 | `<지표>_value`(**새 열**: `tempo_match`, `scale_deviation`, `pitch_range`, `bars_match`, `bars_min`) + `<지표>_reason`(사유 문자열) | 숫자 열은 측정 안 했으면 빈 칸 |
 | 통과 여부 | `<지표>`(`pass`/`fail`/`na`) + 곡 단위 `axis1_ok`(**새 열**) | 축 1 정의는 3절 |
-| (1-8 값) | `no_empty_tracks_value`, `midi_instruments_included_value`(v0.3, 맨 끝) | 1-8 은 축 1 집계 제외, 값만 기록 |
+| (1-8 값) | `no_empty_tracks_value`, `midi_instruments_included_value`(v0.3, 맨 끝) | 빈 트랙은 축 1 유지, 악기는 축 1 제외, 값은 둘 다 기록 |
 | 측정 시각 | — | **의도적으로 없음.** 대신 summary 머리의 `evalkit_version` 과 세트 파일 해시 |
 | 유효 곡 비율 / 축 1 실패 곡 제외 | summary 의 '유효 곡 비율'과 '축 1 통과 곡만의 집계' | v0.2 에서 구현 |

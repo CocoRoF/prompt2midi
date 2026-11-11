@@ -1,0 +1,2 @@
+# CI 전용 의존성(런타임·pyproject 에 넣지 않는다). data/sources.csv 에 라이선스를 기록해야 하며 tools/check_licenses.py 가 확인한다.
+playwright==1.65.0

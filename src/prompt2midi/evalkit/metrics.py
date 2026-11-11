@@ -197,7 +197,7 @@ def no_empty_tracks(ctx: Context) -> Result:
     if (f := _failed(ctx)):
         return f
     n = _analyse(ctx.midi)["empty_tracks"]
-    return Result(FAIL if n else PASS, f"빈 트랙 {n}개")
+    return Result(FAIL if n else PASS, f"빈 트랙 {n}개", n)
 
 
 def midi_instruments_included(ctx: Context) -> Result:
@@ -212,7 +212,7 @@ def midi_instruments_included(ctx: Context) -> Result:
     if DRUM_CHANNEL in a["notes"]:
         have.add("drums")
     missing = [w for w in want if w not in have]
-    return Result(FAIL if missing else PASS, f"MIDI 에 빠진 악기 {missing}" if missing else f"MIDI 프로그램 {sorted(have)}")
+    return Result(FAIL if missing else PASS, f"MIDI 에 빠진 악기 {missing}" if missing else f"MIDI 프로그램 {sorted(have)}", round((len(want) - len(missing)) / len(want), 4))
 
 
 def scale_deviation(ctx: Context) -> Result:
@@ -252,16 +252,27 @@ class Metric:
     fn: Callable[[Context], Result]
 
 
-# Metrics that also write a number to the CSV (`<name>_value`).
+# Metrics that also write a number to the CSV (`<name>_value`). V03 columns were added later and go last (CSV order is kept).
 VALUE_METRICS = ("tempo_match", "scale_deviation", "pitch_range", "bars_match", "bars_min")
+VALUE_METRICS_V03 = ("no_empty_tracks", "midi_instruments_included")  # 1-8 values: recorded as columns (empty tracks also stay in axis 1)
 # 연구 1팀 axis 1 (MIDI validity, docs/eval-metrics.md section 7) as implemented here: a piece that fails any of
-# these is dropped from the axis 2/3 aggregation. Instruments are deliberately NOT here: 3-7 (instrument match) is an
-# axis 3 measure and must not be filtered by itself. `deterministic` is a harness property, in neither group.
+# these is dropped from the axis 2/3 aggregation. 1-8 split (연구 1팀 3차 회신): empty tracks are a file-structure defect and stay in
+# axis 1; the instrument measure (midi_instruments_included) is NOT here and counts as axis 3 (3-7) only. Both values are CSV columns.
+# `deterministic` is a harness property, in no group.
 AXIS1_METRICS = ("midicheck_valid", "pitch_range", "note_integrity", "no_empty_tracks", "bars_min")
-AXIS23_METRICS = ("tempo_match", "key_match", "time_signature_match", "bars_match", "instruments_included", "midi_instruments_included", "scale_deviation")
+# Axis 2/3 = what the finished piece (the MIDI) does. Aggregated over axis-1-passing pieces only.
+AXIS23_METRICS = ("tempo_match", "time_signature_match", "midi_instruments_included", "scale_deviation")
+# Spec extraction = label vs the *declared spec* (not the piece). Not an axis 2/3 measure; summary.md has its own section.
+# Intent v1 field-match metrics (연구 1팀 3-1) belong here when their schema is used: add them to this tuple.
+EXTRACTION_METRICS = ("key_match", "bars_match", "instruments_included")
+# Names shown in summary.md (the CSV keeps the metric names). `key_match` is NOT 연구 1팀 2-2 (spec key vs the key estimated from the piece).
+DISPLAY_TITLES = {
+    "key_match": "조성 선언 일치(사양 추출)",
+    "bars_match": "마디 수 선언 일치(사양 추출)",
+    "instruments_included": "악기 선언 일치(사양 추출)",
+}
 
 
-# Order = column order. Add new metrics here (e.g. Intent v1 field match, once its schema exists).
 METRICS: tuple[Metric, ...] = (
     Metric("tempo_match", "템포 일치", tempo_match),
     Metric("key_match", "조성 일치", key_match),

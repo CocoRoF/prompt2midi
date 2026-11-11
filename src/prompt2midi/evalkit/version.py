@@ -1,3 +1,3 @@
 """Code version of the harness. Written into summary.md (a version, not a time: output stays reproducible).
 Bump it when metrics, thresholds or output columns change."""
-EVALKIT_VERSION = "0.2.0"
+EVALKIT_VERSION = "0.3.0"

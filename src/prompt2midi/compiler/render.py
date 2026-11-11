@@ -22,6 +22,7 @@ from ..spec import (
 )
 from ..validate.theory import CHORD_TONES, check_theory
 from . import drums as D
+from .melody_v2 import build_melody
 from .rng import Rng
 
 PPQ = 480
@@ -121,6 +122,11 @@ def _bass_track(spec: MusicSpec, track: Track, rng: Rng) -> list[_Note]:
         for s, ln, p in plan:
             notes.append(_Note(s, s + max(1, int(ln * 0.9)), p, _vel(70, sec.energy, rng)))
     return notes
+
+
+def _melody_track_v2(spec: MusicSpec, track: Track, seed: int) -> list[_Note] | None:
+    got = build_melody(spec, track, seed, list(_slots(spec)), _ticks(beats_per_bar(spec)), PPQ, lambda energy, rng: _vel(65, energy, rng))
+    return None if got is None else [_Note(n.start, n.end, n.pitch, n.velocity) for n in got]
 
 
 def _melody_track(spec: MusicSpec, track: Track, rng: Rng) -> list[_Note]:
@@ -234,9 +240,11 @@ def compile_spec(spec: MusicSpec, seed: int | None = None) -> bytes:
     for track in sorted(spec.tracks, key=lambda t: CHANNEL[t.role.value]):
         role = track.role.value
         rng = Rng(base_seed, role)
-        # engine "v2" (docs/compiler-v2.md) delegates to the v1 builders until its PRs land; None/"v1" is v1.
+        # engine "v2" (docs/compiler-v2.md): melody is v2 (PR2); the other roles still delegate to the v1 builders.
         if track.role is Role.melody:
-            notes = _melody_track(spec, track, rng)
+            notes = _melody_track_v2(spec, track, base_seed) if spec.engine == "v2" else None
+            if notes is None:  # v1, or a v2 motif that does not fit the register
+                notes = _melody_track(spec, track, rng)
         elif track.role is Role.bass:
             notes = _bass_track(spec, track, rng)
         elif track.role is Role.chords:

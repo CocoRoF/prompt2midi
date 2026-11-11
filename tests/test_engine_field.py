@@ -29,11 +29,11 @@ def _with(spec, engine):
 
 
 @pytest.mark.parametrize("seed", [None, 7])
-def test_none_v1_v2_are_byte_identical(seed):
+def test_none_and_v1_are_byte_identical(seed):
+    # (engine="v2" has differed since PR2 - the melody; see tests/test_melody_v2.py for what v2 may change)
     for spec in _specs():
         base = spec.model_copy(update={"seed": seed})
-        out = {e: compile_spec(_with(base, e)) for e in (None, "v1", "v2")}
-        assert out["v1"] == out[None] == out["v2"]
+        assert compile_spec(_with(base, "v1")) == compile_spec(_with(base, None))
 
 
 def test_effective_seed_ignores_engine():
